@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบันทึกและเฝ้าระวังภาวะขาดน้ำทหารใหม่ - ปตอ.๒ พัน.๑</title>
+    <style>
+        /* ================= STYLE สำหรับหน้าจอคีย์ข้อมูล (Clinical Web Interface) ================= */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, 'Leelawadee';
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 15px;
+            color: #0f172a;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            border: 1px solid #e2e8f0;
+        }
+        h1 { text-align: center; color: #1e3a8a; margin-bottom: 5px; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; }
+        p.subtitle { text-align: center; color: #475569; margin-top: 0; margin-bottom: 25px; font-size: 14px; }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f1f5f9;
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            border: 1px solid #cbd5e1;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .date-picker-wrap { font-weight: 600; font-size: 15px; color: #334155; }
+        .date-picker-wrap input { padding: 6px 10px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 14px; color: #0f172a; }
+        
+        .action-buttons { display: flex; gap: 10px; }
+        .btn-report {
+            background-color: #2563eb; color: white; border: none;
+            padding: 10px 20px; font-size: 14px; font-weight: 600;
+            border-radius: 4px; cursor: pointer; transition: background 0.2s;
+        }
+        .btn-report:hover { background-color: #1d4ed8; }
+
+        /* ปุ่มสำหรับผู้ดูแลระบบสไตล์เทคนิคัล */
+        .btn-admin {
+            background-color: #0f172a; color: #e2e8f0; border: 1px solid #334155;
+            padding: 10px 16px; font-size: 14px; font-weight: 600;
+            border-radius: 4px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-admin:hover { background-color: #1e293b; color: white; border-color: #475569; }
+
+        .time-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .time-btn { padding: 12px; font-size: 15px; font-weight: 600; border: 1px solid #cbd5e1; background-color: #fff; border-radius: 4px; cursor: pointer; text-align: center; color: #64748b; }
+        .time-btn.active-M { background-color: #0284c7; color: white; border-color: #0284c7; }
+        .time-btn.active-A { background-color: #0f172a; color: white; border-color: #0f172a; }
+        .time-btn.active-E { background-color: #0d9488; color: white; border-color: #0d9488; }
+
+        .tab-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .tab-btn { padding: 10px; font-size: 14px; font-weight: 600; border: 1px solid #cbd5e1; background-color: #fff; border-radius: 4px; cursor: pointer; color: #64748b; }
+        .tab-btn.active-G1 { background-color: #334155; color: white; border-color: #334155; }
+        .tab-btn.active-G2 { background-color: #334155; color: white; border-color: #334155; }
+        .tab-btn.active-G3 { background-color: #334155; color: white; border-color: #334155; }
+
+        /* แดชบอร์ดสไตล์คลินิก */
+        .summary-dashboard {
+            display: grid; grid-template-columns: repeat(6, 1fr);
+            gap: 10px; margin-bottom: 25px; background: #f8fafc; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;
+        }
+        .summary-card { background: #fff; padding: 10px; border-radius: 4px; text-align: center; border: 1px solid #e2e8f0; border-top: 4px solid #94a3b8; }
+        .summary-card.total { border-top-color: #1e3a8a; }
+        .summary-card.c0 { border-top-color: #bae6fd; }
+        .summary-card.c1 { border-top-color: #fef08a; }
+        .summary-card.c2 { border-top-color: #fde047; }
+        .summary-card.c3 { border-top-color: #f87171; }
+        .summary-card.c4 { border-top-color: #b91c1c; }
+        
+        .summary-card .count { font-size: 22px; font-weight: 700; margin-top: 4px; color: #1e293b; }
+        .summary-card .title { font-size: 11px; color: #64748b; font-weight: 600; min-height: 28px; display: flex; align-items: center; justify-content: center; }
+        .summary-card.c0 .count { color: #0284c7; }
+        .summary-card.c3 .count { color: #dc2626; }
+        .summary-card.c4 .count { color: #991b1b; }
+
+        .soldier-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        .soldier-table th { background-color: #1e293b; color: white; padding: 10px; font-size: 14px; font-weight: 600; text-transform: uppercase; }
+        .soldier-table td { border-bottom: 1px solid #e2e8f0; padding: 8px 10px; }
+        .soldier-name { font-weight: 500; font-size: 14px; color: #334155; }
+
+        /* ปรับกลุ่มปุ่มกดตรวจระดับสารคัดหลั่ง */
+        .color-btn-group { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; max-width: 320px; }
+        .color-btn { border: 1px solid #cbd5e1; padding: 8px 0; font-weight: 700; font-size: 13px; border-radius: 4px; cursor: pointer; text-align: center; }
+        .btn-c0 { background-color: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
+        .btn-c1 { background-color: #fefce8; color: #854d0e; border-color: #fef08a; }
+        .btn-c2 { background-color: #fef9c3; color: #713f12; border-color: #fde047; }
+        .btn-c3 { background-color: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+        .btn-c4 { background-color: #7f1d1d; color: #ffffff; border-color: #7f1d1d; }
+
+        .color-btn.selected { border: 2px solid #0f172a !important; box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.15); transform: scale(1.02); }
+        .result-status { font-weight: 600; text-align: center; font-size: 13px; }
+
+        #printArea { display: none; }
+
+        /* ================= 🖨️ MEDICAL REPORT STYLE (บีบอัดให้อยู่ใน A4 แนวนอนหน้าเดียว) ================= */
+        @media print {
+            body { background-color: #fff; padding: 0; margin: 0; color: #000; font-family: 'Leelawadee', 'Tahoma', sans-serif; }
+            .container { display: none !important; } 
+            #printArea { display: block !important; width: 100%; } 
+            
+            @page {
+                size: A4 landscape; 
+                margin: 5mm 6mm 4mm 6mm;
+            }
+
+            .print-header { text-align: center; margin-bottom: 6px; border-bottom: 2px solid #000; padding-bottom: 4px; }
+            .print-header h2 { margin: 0 0 2px 0; font-size: 14px; font-weight: bold; color: #000; }
+            .print-header p { margin: 0 0 3px 0; font-size: 11px; font-weight: bold; }
+
+            .print-table-summary { border-collapse: collapse; margin: 0 auto 8px auto; width: 420px; font-size: 9.5px; }
+            .print-table-summary th, .print-table-summary td { border: 1px solid #000; padding: 2.5px; text-align: center; }
+            .print-table-summary th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            
+            .cols-container { display: flex; justify-content: space-between; width: 100%; align-items: flex-start; }
+            .col { width: 32.5%; }
+            
+            .col-title { border: 1px solid #000; font-weight: bold; text-align: center; padding: 2px; background: #e2e8f0 !important; font-size: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; border-bottom: none; }
+            
+            .main-table { width: 100%; border-collapse: collapse; font-size: 8px; margin-bottom: 4px; }
+            .main-table th, .main-table td { border: 1px solid #000; padding: 1.5px 1px; text-align: center; line-height: 1.1; }
+            .main-table th { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+            .sub-summary-table { width: 100%; border-collapse: collapse; font-size: 7.5px; margin-top: 2px; }
+            .sub-summary-table td { border: 1px solid #000; padding: 1.5px; text-align: center; }
+
+            .lc0 { background-color: #e0f2fe !important; color: #0369a1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } 
+            .lc1 { background-color: #fffbeb !important; color: #000000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } 
+            .lc2 { background-color: #fef9c3 !important; color: #000000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } 
+            .lc3 { background-color: #fee2e2 !important; color: #b91c1c !important; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; } 
+            .lc4 { background-color: #7f1d1d !important; color: #ffffff !important; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📋 ระบบบันทึกและเฝ้าระวังดัชนีภาวะขาดน้ำรายวัน (Urine Color Chart)</h1>
+    <p class="subtitle">หน่วยฝึกทหารใหม่ ปตอ.๒ พัน.๑ ผลัดที่ ๑/๖๙ • ส่วนคัดกรองเวชกรรมป้องกัน</p>
+
+    <div class="top-bar">
+        <div class="date-picker-wrap">
+            📅 วันที่ทำการบันทึกข้อมูลคัดกรอง: <input type="date" id="reportDate" onchange="loadDateData()">
+        </div>
+        <div class="action-buttons">
+            <button class="btn-report" onclick="generateAndPrint()">🖨️ ออกเอกสารรายงานเวชระเบียนสรุปประจำวัน (A4)</button>
+            <button class="btn-admin" onclick="checkAdminAccess()">🛡️ ศูนย์ควบคุมผู้ดูแลระบบ</button>
+        </div>
+    </div>
+
+    <label style="font-weight: 600; color: #1e3a8a;">⏱️ 1. เลือกช่วงเวลาการตรวจทางคลินิก (Clinical Session):</label>
+    <div class="time-container">
+        <button class="time-btn active-M" id="btnTimeM" onclick="switchTime('M')">🌅 ตรวจรอบเช้า (05:30 น.)</button>
+        <button class="time-btn" id="btnTimeA" onclick="switchTime('A')">☀️ ตรวจรอบกลางวัน (13:00 น.)</button>
+        <button class="time-btn" id="btnTimeE" onclick="switchTime('E')">🌆 ตรวจรอบเย็น (17:30 น.)</button>
+    </div>
+
+    <label style="font-weight: 600; color: #1e3a8a;" id="dashboardTitle">📊 แดชบอร์ดสรุปสถิติกองร้อยประจำรอบเช้า (05:30 น.):</label>
+    <div class="summary-dashboard">
+        <div class="summary-card total"><div class="title">คัดกรองแล้ว (นาย)</div><div class="count" id="dashTotal">0 / 83</div></div>
+        <div class="summary-card c0"><div class="title">ระดับ 0<br>(น้ำมากเกินไป)</div><div class="count" id="dashC0">0</div></div>
+        <div class="summary-card c1"><div class="title">ระดับ 1<br>(สภาวะปกติ)</div><div class="count" id="dashC1">0</div></div>
+        <div class="summary-card c2"><div class="title">ระดับ 2<br>(เฝ้าระวังต่ำ)</div><div class="count" id="dashC2">0</div></div>
+        <div class="summary-card c3"><div class="title">🚨 ระดับ 3<br>(ภาวะขาดน้ำ)</div><div class="count" id="dashC3">0</div></div>
+        <div class="summary-card c4"><div class="title">🚨 ระดับ 4<br>(ขาดน้ำรุนแรง)</div><div class="count" id="dashC4">0</div></div>
+    </div>
+
+    <label style="font-weight: 600; color: #1e3a8a;">👤 2. เลือกส่วนควบคุมกองกำลัง (หมวดฝึก):</label>
+    <div class="tab-container">
+        <button class="tab-btn active-G1" id="btnTabG1" onclick="switchGroup('1')">หมวดฝึกที่ ๑ (อัตรากำลัง 27 นาย)</button>
+        <button class="tab-btn" id="btnTabG2" onclick="switchGroup('2')">หมวดฝึกที่ ๒ (อัตรากำลัง 27 นาย)</button>
+        <button class="tab-btn" id="btnTabG3" onclick="switchGroup('3')">หมวดฝึกที่ ๓ (อัตรากำลัง 29 นาย)</button>
+    </div>
+
+    <h2 id="tableSectionTitle" style="font-size: 16px; color: #1e293b; margin-bottom: 8px; border-left: 4px solid #2563eb; padding-left: 8px;">บัญชีรายชื่อกำลังพลคัดกรอง: หมวดฝึกที่ ๑</h2>
+    <table class="soldier-table">
+        <thead>
+            <tr>
+                <th style="text-align: left; padding-left: 15px;">เลขรหัสประจำตัว / ยศ นามสกุล</th>
+                <th style="width: 330px;">ผลการตรวจประเมินดัชนีสีปัสสาวะ</th>
+                <th style="width: 150px;">การวินิจฉัยเบื้องต้น</th>
+            </tr>
+        </thead>
+        <tbody id="soldierRows"></tbody>
+    </table>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+    const database = {
+        '1': ["A-01 พลฯ กฤษกร แสงใสแก้ว", "A-02 พลฯ ชยานันต์ ขจิตสุวรรณ", "A-03 พลฯ อนุสรณ์ บัวทอง", "A-04 พลฯ สิธร จอมพงษ์", "A-05 พลฯ นพเก้า โพธิรักษ์", "A-06 พลฯ พัสกร สรรพสาร", "A-07 พลฯ ธนเดช ช้างจันทร์", "A-08 พลฯ ปกรณ์ ด้วงสงค์", "A-09 พลฯ วุฒธิพัตร มังคะละ", "A-10 พลฯ ธรรมนูญ พึ่งพวก", "A-11 พลฯ รัตนชัย ชดเชย", "A-12 พลฯ นนทกานต์ จันทร์ฯ", "A-13 พลฯ นนทภัทร อ่ำเอี่ยม", "A-14 พลฯ เจษฎา จีนแจ้ง", "A-15 พลฯ อรรถพล หงสุวรรณ์", "A-16 พลฯ นวภูมิ สุครีพ", "A-17 พลฯ ภูมิพัฒน์ เคนกุดรัง", "A-18 พลฯ จักรี นามวัน", "A-19 พลฯ ปริญญา ทองใบ", "A-20 พลฯ รัชตธร แซ่เอี่ยว", "A-21 พลฯ มงคล เจ้าสุวรรณ", "A-22 พลฯ จิรายุ แจ่มวงค์", "A-23 พลฯ ชินวัตร ชะมารัมย์", "A-24 พลฯ ธนากร จันทร์ฯ", "A-25 พลฯ ทรงพล หอมเหลือ", "A-26 พลฯ วรินทร แสงตะวัน", "A-27 พลฯ ปฏิกรณ์ พลชารี"],
+        '2': ["B-01 พลฯ กฤตภาส เหล็งบำรุง", "B-02 พลฯ ธนาคาร ลื้อประสิทธิ์", "B-03 พลฯ ธีรเมธ เกตุเม้า", "B-04 พลฯ จิรายุ อุดทา", "B-05 พลฯ เจษฎาพล อุดทา", "B-06 พลฯ สุปรีชา เสมอใจ", "B-07 พลฯ แทนไทย แสนเสนา", "B-08 พลฯ อานุภาพ เคางาม", "B-09 พลฯ อชิรวัช อภัยพิพัฒน์", "B-10 พลฯ ธวัชชัย วงศ์แดง", "B-11 พลฯ อภิชาติ บุญเกิ่ง", "B-12 พลฯ สุธิมนต์ สุภาพ", "B-13 พลฯ ชวัลวิทย์ ผดุงวิศว์", "B-14 พลฯ รัฐกรณ์ จันทะวัน", "B-15 พลฯ ศุภโชค ทองชำนาญ", "B-16 พลฯ ธนวัตน์ ดวงกระจาย", "B-17 พลฯ ศักด์ชัย โลกประโคน", "B-18 พลฯ ศุภกฤต สดไธสง", "B-19 พลฯ ศิวกร มงคล", "B-20 พลฯ ชิติพัทธ์ ปานเจริญ", "B-21 พลฯ ทรงชัย รุ่งสว่าง", "B-22 พลฯ วรวุฒิ เผือกอำไพ", "B-23 พลฯ วิทวัส เมืองหมุด", "B-24 พลฯ รชต ด้วงสงค์", "B-25 พลฯ บุญสืบ เทียมพิทักษ์", "B-26 พลฯ วุฒิพงษ์ แซ่ลี้", "B-27 พลฯ กันต์พิจักษณ์ แจ่มฯ"],
+        '3': ["C-01 พลฯ ชุติพนธ์ ทรงฤทธิ์", "C-02 พลฯ วราวุธ อุปสาร", "C-03 พลฯ อมรเทพ กันหะบุตร", "C-04 พลฯ ธีระ กนิษฐะสุนทร", "C-05 พลฯ พีรพัฒน์ สังวาลย์", "C-06 พลฯ อิทธิพล บุตรอินทร์", "C-07 พลฯ ธีรเมธ แก้วถาวร", "C-08 พลฯ ธีรศาสนติ์ รัมมะศักดิ์", "C-09 พลฯ ณัฐวุฒิ ถิ่มตะเคียน", "C-10 พลฯ เทียนอดิสร เนติธนวัฒน์", "C-11 พลฯ ชัยรัช รจนากร", "C-12 พลฯ จตุพล ทองกระจาย", "C-13 พลฯ ภูวดล ทองทับ", "C-14 พลฯ กฤษณะ ทองอรุณ", "C-15 พลฯ ชัยพร ทองสะอาด", "C-16 พลฯ ศิวกร วงศ์หงษ์", "C-17 พลฯ รัฐกานต์ ยอดอาจ", "C-18 พลฯ หรรษา เพชรบรม", "C-19 พลฯ ชนะพงศ์ สังข์ปลื้ม", "C-20 พลฯ วัชระ ธนะประสิทธิ์", "C-21 พลฯ ยงยุทธ มุจริณร์", "C-22 พลฯ ภาณุพงษ์ หงษ์", "C-23 พลฯ ทินภัทร อิงชัยภูมิ", "C-24 พลฯ ทรงชัย สุวรรณชัยรบ", "C-25 พลฯ กฤตพล ลำเพยพล", "C-26 พลฯ ภูวมินทร์ ซุยคง", "C-27 พลฯ อภิเชษฐ ไชยโคตร", "C-28 พลฯ กิตติไชย แดงบุญเรือง", "C-29 พลฯ รัฐกานต์ มาช่วย"]
+    };
+
+    let sessionData = { M: {}, A: {}, E: {} };
+    let activeTime = 'M';
+    let activeGroup = '1';
+
+    function initCurrentDate() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        document.getElementById('reportDate').value = `${year}-${month}-${day}`;
+    }
+
+    initCurrentDate();
+    loadDateData();
+
+    // 🔒 ฟังก์ชันตรวจสอบรหัสผ่านสำหรับเข้าหน้า Admin Dashboard
+    function checkAdminAccess() {
+        const password = prompt("🔐 กรุณากรอกรหัสผ่านผู้ดูแลระบบ (Admin Password):");
+        if (password === "gundamman") {
+            window.location.href = "admin.html"; // เข้าสู่หน้ากราฟเมื่อรหัสผ่านถูกต้อง
+        } else if (password !== null) {
+            alert("❌ รหัสผ่านไม่ถูกต้อง! ปฏิเสธการเข้าถึงข้อมูลระบบควบคุม");
+        }
+    }
+
+    function loadDateData() {
+        const dateKey = document.getElementById('reportDate').value;
+        const saved = localStorage.getItem(`urine_med_data_${dateKey}`);
+        sessionData = saved ? JSON.parse(saved) : { M: {}, A: {}, E: {} };
+        renderRows();
+        updateDashboard();
+    }
+
+    function saveData() {
+        const dateKey = document.getElementById('reportDate').value;
+        localStorage.setItem(`urine_med_data_${dateKey}`, JSON.stringify(sessionData));
+    }
+
+    function switchTime(time) {
+        activeTime = time;
+        document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active-M','active-A','active-E'));
+        document.getElementById(`btnTime${time}`).classList.add(`active-${time}`);
+        const names = { 'M': 'รอบเช้า (05:30 น.)', 'A': 'รอบกลางวัน (13:00 น.)', 'E': 'รอบเย็น (17:30 น.)' };
+        document.getElementById('dashboardTitle').textContent = `📊 แดชบอร์ดสรุปสถิติกองร้อยประจำ${names[time]}:`;
+        renderRows();
+        updateDashboard();
+    }
+
+    function switchGroup(group) {
+        activeGroup = group;
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active-G1','active-G2','active-G3'));
+        document.getElementById(`btnTabG${group}`).classList.add(`active-G${group}`);
+        document.getElementById('tableSectionTitle').textContent = `บัญชีรายชื่อกำลังพลคัดกรอง: หมวดฝึกที่ ${group === '1' ? '๑' : group === '2' ? '๒' : '๓'}`;
+        renderRows();
+    }
+
+    function renderRows() {
+        const tbody = document.getElementById('soldierRows');
+        tbody.innerHTML = '';
+        database[activeGroup].forEach((name, idx) => {
+            const soldierID = `${activeGroup}_${idx}`;
+            const selectedLevel = sessionData[activeTime][soldierID] !== undefined ? sessionData[activeTime][soldierID] : null;
+
+            let text = 'ยังไม่ได้ตรวจ'; let style = 'color: #94a3b8; font-weight: normal;';
+            if(selectedLevel === 0) { text = 'น้ำมากเกิน (Overhydrated)'; style = 'color: #0284c7;'; }
+            if(selectedLevel === 1) { text = 'ปกติ (Hydrated)'; style = 'color: #16a34a;'; }
+            if(selectedLevel === 2) { text = 'เฝ้าระวังขั้นต้น'; style = 'color: #ca8a04;'; }
+            if(selectedLevel === 3) { text = 'ขาดน้ำ (Dehydrated)'; style = 'color: #dc2626; font-weight: 600;'; }
+            if(selectedLevel === 4) { text = 'ขาดน้ำรุนแรง (Severe)'; style = 'color: #991b1b; font-weight: 700;'; }
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="soldier-name">${name}</td>
+                <td>
+                    <div class="color-btn-group">
+                        <div class="color-btn btn-c0 ${selectedLevel === 0 ? 'selected' : ''}" onclick="selectColor(this, '${soldierID}', 0)">0</div>
+                        <div class="color-btn btn-c1 ${selectedLevel === 1 ? 'selected' : ''}" onclick="selectColor(this, '${soldierID}', 1)">1</div>
+                        <div class="color-btn btn-c2 ${selectedLevel === 2 ? 'selected' : ''}" onclick="selectColor(this, '${soldierID}', 2)">2</div>
+                        <div class="color-btn btn-c3 ${selectedLevel === 3 ? 'selected' : ''}" onclick="selectColor(this, '${soldierID}', 3)">3</div>
+                        <div class="color-btn btn-c4 ${selectedLevel === 4 ? 'selected' : ''}" onclick="selectColor(this, '${soldierID}', 4)">4</div>
+                    </div>
+                </td>
+                <td class="result-status" style="${style}" id="status_${soldierID}">${text}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    function selectColor(element, id, level) {
+        element.parentElement.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
+        element.classList.add('selected');
+        sessionData[activeTime][id] = level;
+
+        const lbl = document.getElementById(`status_${id}`);
+        if(level === 0) { lbl.textContent = 'น้ำมากเกิน (Overhydrated)'; lbl.style = 'color: #0284c7; font-weight:600;'; }
+        if(level === 1) { lbl.textContent = 'ปกติ (Hydrated)'; lbl.style = 'color: #16a34a; font-weight:600;'; }
+        if(level === 2) { lbl.textContent = 'เฝ้าระวังขั้นต้น'; lbl.style = 'color: #ca8a04; font-weight:600;'; }
+        if(level === 3) { lbl.textContent = 'ขาดน้ำ (Dehydrated)'; lbl.style = 'color: #dc2626; font-weight:700;'; }
+        if(level === 4) { lbl.textContent = 'ขาดน้ำรุนแรง (Severe)'; lbl.style = 'color: #991b1b; font-weight:700;'; }
+
+        saveData();
+        updateDashboard();
+    }
+
+    function updateDashboard() {
+        let checked = 0, c0 = 0, c1 = 0, c2 = 0, c3 = 0, c4 = 0;
+        const currentData = sessionData[activeTime];
+        for (const id in currentData) {
+            if (currentData[id] !== null && currentData[id] !== undefined) {
+                checked++;
+                if(currentData[id] === 0) c0++; if(currentData[id] === 1) c1++; 
+                if(currentData[id] === 2) c2++; if(currentData[id] === 3) c3++; 
+                if(currentData[id] === 4) c4++;
+            }
+        }
+        document.getElementById('dashTotal').textContent = `${checked} / 83`;
+        document.getElementById('dashC0').textContent = c0; document.getElementById('dashC1').textContent = c1; 
+        document.getElementById('dashC2').textContent = c2; document.getElementById('dashC3').textContent = c3; 
+        document.getElementById('dashC4').textContent = c4;
+    }
+
+    function generateAndPrint() {
+        const dateInput = document.getElementById('reportDate').value;
+        const formattedDate = dateInput ? new Date(dateInput).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
+        
+        let stat = { M:{0:0,1:0,2:0,3:0,4:0}, A:{0:0,1:0,2:0,3:0,4:0}, E:{0:0,1:0,2:0,3:0,4:0} };
+        ['M','A','E'].forEach(t => {
+            for(let id in sessionData[t]) {
+                let lvl = sessionData[t][id]; if(lvl !== null && lvl !== undefined) stat[t][lvl]++;
+            }
+        });
+
+        let tM = Object.values(stat.M).reduce((a,b)=>a+b,0);
+        let tA = Object.values(stat.A).reduce((a,b)=>a+b,0);
+        let tE = Object.values(stat.E).reduce((a,b)=>a+b,0);
+
+        let html = `
+            <div class="print-header">
+                <h2>แบบรายงานและเฝ้าระวังเวชกรรมป้องกัน ดัชนีภาวะขาดน้ำรายวัน (Urine Color Medical Record)</h2>
+                <p>หน่วยฝึกทหารใหม่ ปตอ.๒ พัน.๑ ผลัดที่ ๑/๖๙ • ประจำวันที่: ${formattedDate}</p>
+            </div>
+            
+            <table class="print-table-summary">
+                <thead>
+                    <tr>
+                        <th>การจำแนกสภาวะ (Medical Classification)</th>
+                        <th>รอบเช้า</th>
+                        <th>รอบกลางวัน</th>
+                        <th>รอบเย็น</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td style="text-align:left; padding-left:10px;">ระดับ 0 : ดื่มน้ำมากเกินความจำเป็น (Overhydrated)</td><td>${stat.M[0]}</td><td>${stat.A[0]}</td><td>${stat.E[0]}</td></tr>
+                    <tr><td style="text-align:left; padding-left:10px;">ระดับ 1 : สมดุลน้ำในร่างกายปกติ (Optimal Hydrated)</td><td>${stat.M[1]}</td><td>${stat.A[1]}</td><td>${stat.E[1]}</td></tr>
+                    <tr><td style="text-align:left; padding-left:10px;">ระดับ 2 : เริ่มมีความเสี่ยงขาดน้ำขั้นต้น (Mild Dehydration)</td><td>${stat.M[2]}</td><td>${stat.A[2]}</td><td>${stat.E[2]}</td></tr>
+                    <tr><td style="text-align:left; padding-left:10px; color:#c00; font-weight:bold;">ระดับ 3 : ภาวะขาดน้ำ ควรได้รับการชดเชยน้ำ (Dehydrated)</td><td style="font-weight:bold; color:#c00;">${stat.M[3]}</td><td style="font-weight:bold; color:#c00;">${stat.A[3]}</td><td style="font-weight:bold; color:#c00;">${stat.E[3]}</td></tr>
+                    <tr><td style="text-align:left; padding-left:10px; color:#900; font-weight:bold;">ระดับ 4 : ภาวะขาดน้ำรุนแรง เสี่ยงต่อโรคลมร้อน (Severe Risk)</td><td style="font-weight:bold; color:#900;">${stat.M[4]}</td><td style="font-weight:bold; color:#900;">${stat.A[4]}</td><td style="font-weight:bold; color:#900;">${stat.E[4]}</td></tr>
+                    <tr style="font-weight:bold; background:#e2e8f0 !important;"><td style="text-align:center;">รวมจํานวนพลคัดกรองสุทธิ (นาย)</td><td>${tM}</td><td>${tA}</td><td>${tE}</td></tr>
+                </tbody>
+            </table>
+
+            <div class="cols-container">
+        `;
+
+        ['1','2','3'].forEach(g => {
+            html += `
+                <div class="col">
+                    <div class="col-title">หมวดฝึกที่ ${g === '1' ? '๑' : g === '2' ? '๒' : '๓'}</div>
+                    <table class="main-table">
+                        <thead>
+                            <tr>
+                                <th style="width:14%;">รหัส</th>
+                                <th style="text-align:left; padding-left:2px;">ยศ ชื่อ-นามสกุล</th>
+                                <th style="width:14%;">เช้า</th>
+                                <th style="width:14%;">ก.วัน</th>
+                                <th style="width:14%;">เย็น</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+            database[g].forEach((name, idx) => {
+                let id = `${g}_${idx}`;
+                let rM = sessionData.M[id] !== undefined ? `class="lc${sessionData.M[id]}"` : '';
+                let rA = sessionData.A[id] !== undefined ? `class="lc${sessionData.A[id]}"` : '';
+                let rE = sessionData.E[id] !== undefined ? `class="lc${sessionData.E[id]}"` : '';
+                
+                let cleanName = name.replace("พลฯ ", "");
+                let tokens = cleanName.split(' ');
+                let shortName = tokens[1] + ' ' + (tokens[2] || '');
+                let code = tokens[0];
+
+                html += `
+                    <tr>
+                        <td><b>${code}</b></td>
+                        <td style="text-align:left; padding-left:2px;">${shortName}</td>
+                        <td ${rM}>${sessionData.M[id] !== undefined ? 'U-'+sessionData.M[id] : '-'}</td>
+                        <td ${rA}>${sessionData.A[id] !== undefined ? 'U-'+sessionData.A[id] : '-'}</td>
+                        <td ${rE}>${sessionData.E[id] !== undefined ? 'U-'+sessionData.E[id] : '-'}</td>
+                    </tr>
+                `;
+            });
+
+            let m0=0,m1=0,m2=0,m3=0,m4=0, a0=0,a1=0,a2=0,a3=0,a4=0, e0=0,e1=0,e2=0,e3=0,e4=0;
+            database[g].forEach((_, idx) => {
+                let id = `${g}_${idx}`;
+                if(sessionData.M[id]===0) m0++; if(sessionData.M[id]===1) m1++; if(sessionData.M[id]===2) m2++; if(sessionData.M[id]===3) m3++; if(sessionData.M[id]===4) m4++;
+                if(sessionData.A[id]===0) a0++; if(sessionData.A[id]===1) a1++; if(sessionData.A[id]===2) a2++; if(sessionData.A[id]===3) a3++; if(sessionData.A[id]===4) a4++;
+                if(sessionData.E[id]===0) e0++; if(sessionData.E[id]===1) e1++; if(sessionData.E[id]===2) e2++; if(sessionData.E[id]===3) e3++; if(sessionData.E[id]===4) e4++;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                    <table class="sub-summary-table">
+                        <tr style="background:#f1f5f9 !important; font-weight:bold;"><td>ระดับทางคลินิก</td><td>เช้า</td><td>กลางวัน</td><td>เย็น</td></tr>
+                        <tr><td>ระดับ 0 (น้ำมากเกิน)</td><td>${m0}</td><td>${a0}</td><td>${e0}</td></tr>
+                        <tr><td>ระดับ 1 (ปกติ)</td><td>${m1}</td><td>${a1}</td><td>${e1}</td></tr>
+                        <tr><td>ระดับ 2 (เฝ้าระวัง)</td><td>${m2}</td><td>${a2}</td><td>${e2}</td></tr>
+                        <tr style="color:#b91c1c;"><td>ระดับ 3 (ขาดน้ำ)</td><td>${m3}</td><td>${a3}</td><td>${e3}</td></tr>
+                        <tr style="color:#7f1d1d; font-weight:bold;"><td>ระดับ 4 (รุนแรง)</td><td>${m4}</td><td>${a4}</td><td>${e4}</td></tr>
+                    </table>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        
+        document.getElementById('printArea').innerHTML = html;
+        window.print();
+    }
+</script>
+</body>
+</html>

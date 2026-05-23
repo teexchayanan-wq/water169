@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ศูนย์ควบคุมและเฝ้าระวังภาวะขาดน้ำ (Admin Dashboard) - ปตอ.๒ พัน.๑</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, 'Leelawadee';
+            background-color: #f0f4f8;
+            margin: 0;
+            padding: 20px;
+            color: #1e293b;
+        }
+        .dashboard-container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+        /* หัวข้อสไตล์ Medical Command Center */
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; }
+        .header p { margin: 5px 0 0 0; font-size: 14px; color: #93c5fd; }
+        
+        .date-control {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 15px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+        }
+        .date-control input {
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* การ์ดแจ้งเตือนภาวะวิกฤต */
+        .alert-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .alert-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            border-left: 5px solid #cbd5e1;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .alert-card.critical { border-left-color: #b91c1c; background: #fff5f5; }
+        .alert-card.critical .num { color: #b91c1c; }
+        .alert-card .title { font-size: 13px; font-weight: 600; color: #64748b; text-transform: uppercase; }
+        .alert-card .num { font-size: 28px; font-weight: 700; margin-top: 5px; }
+        .alert-card .desc { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+        /* ส่วนจัดวางกราฟ */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        @media (max-width: 968px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .alert-row { grid-template-columns: repeat(2, 1fr); }
+        }
+        .chart-box {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            min-height: 380px;
+        }
+        .chart-box h3 { margin-top: 0; margin-bottom: 20px; font-size: 16px; color: #1e293b; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
+
+        .btn-back {
+            background-color: #ffffff; color: #1e3a8a; border: 1px solid #cbd5e1;
+            padding: 8px 16px; font-size: 14px; font-weight: 600;
+            border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+        }
+        .btn-back:hover { background-color: #f8fafc; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <div class="header">
+        <div>
+            <h1>📊 ศูนย์ควบคุมและวิเคราะห์ภาวะขาดน้ำเวชกรรมป้องกัน</h1>
+            <p>หน่วยฝึกทหารใหม่ ปตอ.๒ พัน.๑ ผลัดที่ ๑/๖๙</p>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="index.html" class="btn-back">⬅️ กลับไปหน้าลงบันทึก</a>
+            <div class="date-control">
+                📅 เลือกวันที่ประเมินผล:
+                <input type="date" id="dashDate" onchange="syncDashboardData()">
+            </div>
+        </div>
+    </div>
+
+    <div class="alert-row">
+        <div class="alert-card critical">
+            <div class="title">🚨 ยอดวิกฤต รวมทั้งกองร้อย</div>
+            <div class="num" id="totalCrit">0</div>
+            <div class="desc">ขาดน้ำรุนแรงขั้นสูงสุด (ระดับ 4)</div>
+        </div>
+        <div class="alert-card" style="border-left-color: #3b82f6;">
+            <div class="title">📍 พบใน หมวดฝึกที่ ๑</div>
+            <div class="num" id="g1Crit">0</div>
+            <div class="desc">พลกำลังระดับ 4 ที่ต้องแทรกแซงด่วน</div>
+        </div>
+        <div class="alert-card" style="border-left-color: #10b981;">
+            <div class="title">📍 พบใน หมวดฝึกที่ ๒</div>
+            <div class="num" id="g2Crit">0</div>
+            <div class="desc">พลกำลังระดับ 4 ที่ต้องแทรกแซงด่วน</div>
+        </div>
+        <div class="alert-card" style="border-left-color: #6366f1;">
+            <div class="title">📍 พบใน หมวดฝึกที่ ๓</div>
+            <div class="num" id="g3Crit">0</div>
+            <div class="desc">พลกำลังระดับ 4 ที่ต้องแทรกแซงด่วน</div>
+        </div>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-box">
+            <h3>📊 กราฟแท่งวิเคราะห์ดัชนีสีปัสสาวะเปรียบเทียบ 3 ช่วงเวลา (Clinical Sessions Comparison)</h3>
+            <div style="position: relative; height:320px; width:100%">
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-box">
+            <h3>🎯 สัดส่วนการกระจายความเสี่ยง (Daily Risk Distribution)</h3>
+            <div style="position: relative; height:320px; width:100%">
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // อัตรากำลังพลอ้างอิงเพื่อใช้ตรวจสอบลูปขอบเขตข้อมูล
+    const limits = { '1': 27, '2': 27, '3': 29 };
+    
+    // ประกาศตัวแปรจองพื้นที่ออบเจกต์ของโครงสร้างกราฟป้องกันการวาดทับซ้ำผิดพลาด
+    let barChartInstance = null;
+    let pieChartInstance = null;
+
+    // ตั้งค่าวันปัจจุบันให้กับหน้าควบคุม
+    const today = new Date();
+    document.getElementById('dashDate').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    // เรียกทำงานดึงและวาดกราฟทันทีเมื่อเปิดใช้งานหน้าจอ
+    syncDashboardData();
+
+    function syncDashboardData() {
+        const targetDate = document.getElementById('dashDate').value;
+        const rawData = localStorage.getItem(`urine_med_data_${targetDate}`);
+        
+        // โครงสร้างเมทริกซ์เก็บรวบรวมค่าจำนวนสถิติสรุปส่งต่อให้กราฟ
+        let stats = {
+            M: { 0:0, 1:0, 2:0, 3:0, 4:0 },
+            A: { 0:0, 1:0, 2:0, 3:0, 4:0 },
+            E: { 0:0, 1:0, 2:0, 3:0, 4:0 }
+        };
+
+        let g1_4 = 0, g2_4 = 0, g3_4 = 0;
+
+        if (rawData) {
+            const parsed = JSON.parse(rawData);
+            
+            // ประมวลผลคัดแยกกลุ่มข้อมูลและนับจำนวน
+            ['M', 'A', 'E'].forEach(time => {
+                if (parsed[time]) {
+                    for (let id in parsed[time]) {
+                        let val = parsed[time][id];
+                        if (val !== null && val !== undefined && stats[time][val] !== undefined) {
+                            stats[time][val]++;
+                            
+                            // ดักจับและนับจำนวนเคสวิกฤตระดับ 4 แยกรายหมวดฝึก
+                            if (val === 4) {
+                                let groupPrefix = id.split('_')[0];
+                                if(groupPrefix === '1') g1_4++;
+                                if(groupPrefix === '2') g2_4++;
+                                if(groupPrefix === '3') g3_4++;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // อัปเดตตัวเลขขึ้นแสดงบนหน้าจอการ์ดแจ้งเตือนความเสี่ยงหลัก
+        document.getElementById('g1Crit').textContent = g1_4 + " นาย";
+        document.getElementById('g2Crit').textContent = g2_4 + " นาย";
+        document.getElementById('g3Crit').textContent = g3_4 + " นาย";
+        document.getElementById('totalCrit').textContent = (g1_4 + g2_4 + g3_4) + " นาย";
+
+        // ประมวลผลจัดกลุ่มข้อมูลรวมสำหรับส่งเข้ากราฟวงกลม (รวมสถิติทั่วทั้งวัน)
+        let totalC0 = stats.M[0] + stats.A[0] + stats.E[0];
+        let totalC1 = stats.M[1] + stats.A[1] + stats.E[1];
+        let totalC2 = stats.M[2] + stats.A[2] + stats.E[2];
+        let totalC3 = stats.M[3] + stats.A[3] + stats.E[3];
+        let totalC4 = stats.M[4] + stats.A[4] + stats.E[4];
+
+        // เรียกฟังก์ชันเรนเดอร์ภาพกราฟแสดงผล
+        renderBarChart(stats);
+        renderPieChart(totalC0, totalC1, totalC2, totalC3, totalC4);
+    }
+
+    // ฟังก์ชันสร้างและควบคุมกราฟแท่ง (Multi-Dataset Bar Chart)
+    function renderBarChart(stats) {
+        const ctx = document.getElementById('barChart').getContext('2d');
+        
+        if (barChartInstance) { barChartInstance.destroy(); }
+
+        barChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['ระดับ 0 (น้ำมากเกิน)', 'ระดับ 1 (ปกติ)', 'ระดับ 2 (เฝ้าระวัง)', 'ระดับ 3 (ขาดน้ำ)', 'ระดับ 4 (รุนแรง)'],
+                datasets: [
+                    { label: '🌅 รอบเช้า (05:30 น.)', data: [stats.M[0], stats.M[1], stats.M[2], stats.M[3], stats.M[4]], backgroundColor: '#0284c7' },
+                    { label: '☀️ รอบกลางวัน (13:00 น.)', data: [stats.A[0], stats.A[1], stats.A[2], stats.A[3], stats.A[4]], backgroundColor: '#1e293b' },
+                    { label: '🌆 รอบเย็น (17:30 น.)', data: [stats.E[0], stats.E[1], stats.E[2], stats.E[3], stats.E[4]], backgroundColor: '#0d9488' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 5 } }
+                },
+                plugins: {
+                    legend: { position: 'top', labels: { font: { family: 'Leelawadee' } } }
+                }
+            }
+        });
+    }
+
+    // ฟังก์ชันสร้างและควบคุมกราฟวงกลม (Medical Risk Breakdown)
+    function renderPieChart(c0, c1, c2, c3, c4) {
+        const ctx = document.getElementById('pieChart').getContext('2d');
+        
+        if (pieChartInstance) { pieChartInstance.destroy(); }
+
+        // ป้องกันไม่ให้กราฟแหว่งถ้ายังไม่มีการลงข้อมูลตรวจเลยในวันนั้น
+        let hasData = (c0 + c1 + c2 + c3 + c4) > 0;
+        let chartData = hasData ? [c0, c1, c2, c3, c4] : [0, 0, 0, 0, 0];
+        if(!hasData) {
+            // หากไม่มีข้อมูล ให้แสดงข้อความแจ้งหรือจำลองพื้นที่ว่างเปล่าสีเทาอ่อน
+            chartData = [0, 1, 0, 0, 0]; // ตั้งค่าหลอกให้เรนเดอร์เป็นโครงสร้าง
+        }
+
+        pieChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: hasData ? ['น้ำเยอะไป (U0)', 'ปกติ (U1)', 'เฝ้าระวัง (U2)', 'ขาดน้ำ (U3)', 'ขาดน้ำรุนแรง (U4)'] : ['ยังไม่มีข้อมูลผลตรวจประจำวัน'],
+                datasets: [{
+                    data: hasData ? chartData : [100],
+                    backgroundColor: hasData ? ['#e0f2fe', '#16a34a', '#fca5a5', '#dc2626', '#7f1d1d'] : ['#e2e8f0'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { font: { family: 'Leelawadee', size: 12 } } }
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>
