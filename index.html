@@ -499,7 +499,7 @@
 <body>
 
 <div class="container">
-    <h1>📋 ระบบบันทึกและเฝ้าระวังดัชนีภาวะขาดน้ำรายวัน (Urine Color Chart)</h1>
+    <h1>📋 ระบบบันทึกและเฝ้าระวังดัชนีภาวะขาดน้ำรายวัน </h1>
     <p class="subtitle">หน่วยฝึกทหารใหม่ ปตอ.๒ พัน.๑ ผลัดที่ ๑/๖๙ • ส่วนคัดกรองเวชกรรมป้องกัน</p>
 
     <div class="top-bar">
@@ -507,19 +507,19 @@
             📅 วันที่ทำการบันทึกข้อมูลคัดกรอง: <input type="date" id="reportDate" onchange="loadDateData()">
         </div>
         <div class="action-buttons">
-            <button class="btn-report" onclick="generateAndPrint()">🖨️ ออกเอกสารรายงานเวชระเบียนสรุปประจำวัน (A4)</button>
+            <button class="btn-report" onclick="generateAndPrint()">🖨️ ออกเอกสารรายงานสรุปประจำวัน (A4)</button>
             <button class="btn-admin" onclick="checkAdminAccess()">🛡️ ศูนย์ควบคุมผู้ดูแลระบบ</button>
         </div>
     </div>
 
-    <label style="font-weight: 600; color: #1e3a8a;">⏱️ 1. เลือกช่วงเวลาการตรวจทางคลินิก (Clinical Session):</label>
+    <label style="font-weight: 600; color: #1e3a8a;">⏱️ 1. เลือกช่วงเวลาการตรวจ:</label>
     <div class="time-container">
         <button class="time-btn active-M" id="btnTimeM" onclick="switchTime('M')">🌅 ตรวจรอบเช้า (05:30 น.)</button>
         <button class="time-btn" id="btnTimeA" onclick="switchTime('A')">☀️ ตรวจรอบกลางวัน (13:00 น.)</button>
         <button class="time-btn" id="btnTimeE" onclick="switchTime('E')">🌆 ตรวจรอบเย็น (17:30 น.)</button>
     </div>
 
-    <label style="font-weight: 600; color: #1e3a8a;" id="dashboardTitle">📊 แดชบอร์ดสรุปสถิติกองร้อยประจำรอบเช้า (05:30 น.):</label>
+    <label style="font-weight: 600; color: #1e3a8a;" id="dashboardTitle">📊 แดชบอร์ดสรุปสถิติหน่วยฝึกฯประจำรอบเช้า (05:30 น.):</label>
     <div class="summary-dashboard">
         <div class="summary-card total"><div class="title">คัดกรองแล้ว (นาย)</div><div class="count" id="dashTotal">0 / 83</div></div>
         <div class="summary-card c0"><div class="title">ระดับ 0<br>(น้ำมากเกินไป)</div><div class="count" id="dashC0">0</div></div>
@@ -531,9 +531,9 @@
 
     <label style="font-weight: 600; color: #1e3a8a;">👤 2. เลือกส่วนควบคุมกองกำลัง (หมวดฝึก):</label>
     <div class="tab-container">
-        <button class="tab-btn active-G1" id="btnTabG1" onclick="switchGroup('1')">หมวดฝึกที่ ๑ (อัตรากำลัง 27 นาย)</button>
-        <button class="tab-btn" id="btnTabG2" onclick="switchGroup('2')">หมวดฝึกที่ ๒ (อัตรากำลัง 27 นาย)</button>
-        <button class="tab-btn" id="btnTabG3" onclick="switchGroup('3')">หมวดฝึกที่ ๓ (อัตรากำลัง 29 นาย)</button>
+        <button class="tab-btn active-G1" id="btnTabG1" onclick="switchGroup('1')">หมวดฝึกที่ ๑ </button>
+        <button class="tab-btn" id="btnTabG2" onclick="switchGroup('2')">หมวดฝึกที่ ๒ </button>
+        <button class="tab-btn" id="btnTabG3" onclick="switchGroup('3')">หมวดฝึกที่ ๓ </button>
     </div>
 
     <h2 id="tableSectionTitle" style="font-size: 16px; color: #1e293b; margin-bottom: 8px; border-left: 4px solid #2563eb; padding-left: 8px;">บัญชีรายชื่อกำลังพลคัดกรอง: หมวดฝึกที่ ๑</h2>
@@ -614,7 +614,7 @@
         document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active-M','active-A','active-E'));
         document.getElementById(`btnTime${time}`).classList.add(`active-${time}`);
         const names = { 'M': 'รอบเช้า (05:30 น.)', 'A': 'รอบกลางวัน (13:00 น.)', 'E': 'รอบเย็น (17:30 น.)' };
-        document.getElementById('dashboardTitle').textContent = `📊 แดชบอร์ดสรุปสถิติกองร้อยประจำ${names[time]}:`;
+        document.getElementById('dashboardTitle').textContent = `📊 แดชบอร์ดสรุปสถิติหน่วยฝึกฯประจำ${names[time]}:`;
         renderRows();
         updateDashboard();
     }
@@ -718,12 +718,13 @@
                 </div>
                 <div class="modal-body">
                     <div class="color-btn-group">
+                        <div class="color-btn btn-clear" onclick="selectColorFromModal('${id}', null)">X</div>
                         <div class="color-btn btn-c0 ${currentLevel === 0 ? 'selected' : ''}" onclick="selectColorFromModal('${id}', 0)">0</div>
                         <div class="color-btn btn-c1 ${currentLevel === 1 ? 'selected' : ''}" onclick="selectColorFromModal('${id}', 1)">1</div>
                         <div class="color-btn btn-c2 ${currentLevel === 2 ? 'selected' : ''}" onclick="selectColorFromModal('${id}', 2)">2</div>
                         <div class="color-btn btn-c3 ${currentLevel === 3 ? 'selected' : ''}" onclick="selectColorFromModal('${id}', 3)">3</div>
                         <div class="color-btn btn-c4 ${currentLevel === 4 ? 'selected' : ''}" onclick="selectColorFromModal('${id}', 4)">4</div>
-                        <div class="color-btn btn-clear" onclick="selectColorFromModal('${id}', null)">X</div>
+                        
                     </div>
                     <div class="modal-actions">
                         <button class="modal-close" onclick="closeColorPickerModal()">ยกเลิก</button>
