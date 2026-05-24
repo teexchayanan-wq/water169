@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ศูนย์ควบคุมและเฝ้าระวังภาวะขาดน้ำ (Admin Dashboard) - ปตอ.๒ พัน.๑</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, 'Leelawadee';
@@ -100,6 +101,426 @@
             border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
         }
         .btn-back:hover { background-color: #f8fafc; }
+        /* ================= POLISHED DASHBOARD UI ================= */
+        :root {
+            --bg: #eef6f8;
+            --panel: rgba(255,255,255,0.94);
+            --ink: #102033;
+            --muted: #657487;
+            --line: #d8e4ea;
+            --brand: #0f766e;
+            --brand-dark: #0f3f56;
+            --danger: #b91c1c;
+            --shadow: 0 18px 45px rgba(15, 35, 52, 0.12);
+            --soft-shadow: 0 8px 24px rgba(15, 35, 52, 0.08);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            background:
+                linear-gradient(135deg, rgba(15,118,110,0.10), rgba(37,99,235,0.08) 45%, rgba(252,211,77,0.12)),
+                var(--bg);
+            color: var(--ink);
+            line-height: 1.5;
+        }
+
+        .dashboard-container {
+            max-width: 1340px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #132033, #0f3f56 55%, #0f766e);
+            border: 1px solid rgba(255,255,255,0.22);
+            border-radius: 18px;
+            box-shadow: var(--shadow);
+            padding: 24px 28px;
+        }
+
+        .header h1 {
+            font-size: clamp(22px, 3vw, 31px);
+            line-height: 1.25;
+            letter-spacing: 0;
+        }
+
+        .header p {
+            color: #c6e7ee;
+            font-size: 15px;
+        }
+
+        .date-control,
+        .btn-back {
+            min-height: 42px;
+            border-radius: 11px;
+        }
+
+        .date-control {
+            background: rgba(255,255,255,0.13);
+            border-color: rgba(255,255,255,0.26);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+        }
+
+        .date-control input {
+            min-height: 34px;
+            border-radius: 9px;
+        }
+
+        .btn-back {
+            color: var(--brand-dark);
+            border: 1px solid rgba(255,255,255,0.7);
+            padding: 10px 16px;
+            box-shadow: 0 8px 18px rgba(15, 35, 52, 0.12);
+            transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+        }
+
+        .btn-back:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 24px rgba(15, 35, 52, 0.16);
+        }
+
+        input:focus-visible,
+        a:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, 0.25);
+            outline-offset: 2px;
+        }
+
+        .alert-row {
+            gap: 16px;
+        }
+
+        .alert-card,
+        .chart-box {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            box-shadow: var(--soft-shadow);
+        }
+
+        .alert-card {
+            padding: 18px;
+            border-left-width: 6px;
+        }
+
+        .alert-card.critical {
+            background: linear-gradient(180deg, #fff7f7, #ffffff);
+        }
+
+        .alert-card .title {
+            color: var(--muted);
+            letter-spacing: 0;
+            line-height: 1.35;
+        }
+
+        .alert-card .num {
+            font-size: 34px;
+            line-height: 1.1;
+            color: #132033;
+        }
+
+        .alert-card .desc {
+            color: #7b8a9a;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .charts-grid {
+            gap: 20px;
+        }
+
+        .chart-box {
+            padding: 24px;
+            min-height: 400px;
+        }
+
+        .chart-box h3 {
+            color: var(--brand-dark);
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 12px;
+            margin-bottom: 18px;
+            line-height: 1.35;
+        }
+
+        .roster-panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            box-shadow: var(--soft-shadow);
+            padding: 24px;
+            margin-bottom: 28px;
+        }
+
+        .roster-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .roster-head h2 {
+            margin: 0;
+            color: var(--brand-dark);
+            font-size: 20px;
+            line-height: 1.3;
+        }
+
+        .roster-head p {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .roster-actions,
+        .roster-search {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .roster-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            padding: 16px;
+            background: #f7fbfc;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            margin-bottom: 16px;
+        }
+
+        .roster-field label {
+            display: block;
+            color: #405367;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .roster-field input,
+        .roster-field select {
+            width: 100%;
+            min-height: 38px;
+            border: 1px solid #b9cad4;
+            border-radius: 9px;
+            padding: 8px 10px;
+            color: var(--ink);
+            background: #fff;
+        }
+
+        .roster-field.checkbox-field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #fff;
+        }
+
+        .roster-field.checkbox-field label {
+            margin: 0;
+            order: 2;
+        }
+
+        .roster-field.checkbox-field input {
+            width: 18px;
+            min-height: 18px;
+            margin: 0;
+            order: 1;
+        }
+
+        .roster-btn {
+            min-height: 38px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+        }
+
+        .import-file-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .roster-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 22px rgba(15, 35, 52, 0.12);
+        }
+
+        .roster-btn.primary {
+            color: #fff;
+            background: linear-gradient(135deg, #2563eb, #0f766e);
+            border-color: transparent;
+        }
+
+        .roster-btn.muted {
+            color: #334155;
+            background: #ffffff;
+        }
+
+        .roster-btn.danger {
+            color: #fff;
+            background: #b91c1c;
+            border-color: #b91c1c;
+        }
+
+        .roster-search {
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .roster-search input {
+            flex: 1 1 260px;
+            min-height: 40px;
+            border: 1px solid #b9cad4;
+            border-radius: 10px;
+            padding: 8px 12px;
+        }
+
+        .roster-count {
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .roster-table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: #fff;
+        }
+
+        .roster-table {
+            width: 100%;
+            min-width: 2600px;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 13px;
+        }
+
+        .roster-table th,
+        .roster-table td {
+            padding: 10px 9px;
+            border-bottom: 1px solid #edf3f6;
+            text-align: left;
+            vertical-align: top;
+            white-space: nowrap;
+        }
+
+        .roster-table th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #132033;
+            color: #fff;
+            font-size: 12px;
+        }
+
+        .roster-table tbody tr:nth-child(even) td { background: #f9fcfd; }
+        .roster-table tbody tr:hover td { background: #eef8f7; }
+
+        .roster-row-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        /* ===== MODAL STYLES ===== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+            color: #1e293b;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .modal-button {
+            padding: 10px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+            background: white;
+            color: #334155;
+        }
+
+        .modal-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(15, 35, 52, 0.12);
+        }
+
+        .modal-button.primary {
+            background: linear-gradient(135deg, #0f766e, #0d9488);
+            color: white;
+            border-color: transparent;
+        }
+
+        .modal-button.primary:hover {
+            box-shadow: 0 10px 25px rgba(15, 118, 110, 0.25);
+        }
+
+        .modal-button.danger {
+            background: #dc2626;
+            color: white;
+            border-color: #dc2626;
+        }
+
+        .modal-button.danger:hover {
+            background: #b91c1c;
+            box-shadow: 0 8px 18px rgba(220, 38, 38, 0.25);
+        }
+
+        @media (max-width: 720px) {
+            body { padding: 12px; }
+            .header { padding: 18px; }
+            .header > div:last-child {
+                width: 100%;
+                flex-direction: column;
+                align-items: stretch !important;
+            }
+            .btn-back,
+            .date-control {
+                width: 100%;
+                justify-content: center;
+            }
+            .date-control {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .alert-row { grid-template-columns: 1fr; }
+            .chart-box { padding: 16px; }
+            .roster-panel { padding: 16px; }
+            .roster-head { display: block; }
+            .roster-actions { margin-top: 12px; }
+        }
     </style>
 </head>
 <body>
@@ -156,6 +577,8 @@
             </div>
         </div>
     </div>
+
+    
 </div>
 
 <script>
@@ -165,6 +588,43 @@
     // ประกาศตัวแปรจองพื้นที่ออบเจกต์ของโครงสร้างกราฟป้องกันการวาดทับซ้ำผิดพลาด
     let barChartInstance = null;
     let pieChartInstance = null;
+    const rosterStorageKey = 'soldier_roster_records_v1';
+    const rosterFields = [
+        { key: 'rank', label: 'ยศ' },
+        { key: 'firstName', label: 'ชื่อ' },
+        { key: 'lastName', label: 'สกุล' },
+        { key: 'unit', label: 'หน่วย' },
+        { key: 'trainingGroup', label: 'หมวด', type: 'select', options: [
+            { value: '1', label: 'หมวด 1' },
+            { value: '2', label: 'หมวด 2' },
+            { value: '3', label: 'หมวด 3' }
+        ] },
+        { key: 'citizenId', label: 'เลขบัตรประจำตัวประชาชน' },
+        { key: 'birthDate', label: 'วัน เดือน ปีเกิด', type: 'date' },
+        { key: 'hometown', label: 'ภูมิลำเนา' },
+        { key: 'district', label: 'เขต/อำเภอ' },
+        { key: 'province', label: 'จังหวัด' },
+        { key: 'fatherFirstName', label: 'ชื่อบิดา' },
+        { key: 'fatherLastName', label: 'สกุลบิดา' },
+        { key: 'motherFirstName', label: 'ชื่อมารดา' },
+        { key: 'motherLastName', label: 'สกุลมารดา' },
+        { key: 'education', label: 'การศึกษา' },
+        { key: 'religion', label: 'ศาสนา' },
+        { key: 'weight', label: 'น้ำหนัก', type: 'number' },
+        { key: 'height', label: 'ส่วนสูง', type: 'number' },
+        { key: 'selectOnline', label: 'วิธีการคัดเลือก [คัดเลือกแบบสมัครออนไลน์]', type: 'checkbox' },
+        { key: 'selectRequest', label: 'วิธีการคัดเลือก [คัดเลือกแบบร้องขอ]', type: 'checkbox' },
+        { key: 'selectLottery', label: 'วิธีการคัดเลือก [คัดเลือกแบบจับฉลาก]', type: 'checkbox' },
+        { key: 'selectAvoid', label: 'วิธีการคัดเลือก [คัดเลือกแบบหลีกเลี่ยง]', type: 'checkbox' },
+        { key: 'disease', label: 'โรคประจำตัว' },
+        { key: 'covidVaccine1', label: 'วัคซีนโควิด-19เข็มที่1(ชนิด)' },
+        { key: 'covidVaccine2', label: 'วัคซีนโควิด-19เข็มที่2(ชนิด)' },
+        { key: 'covidVaccine3', label: 'วัคซีนโควิด-19เข็มที่3(ชนิด)' },
+        { key: 'covidVaccine4', label: 'วัคซีนโควิด-19เข็มที่4(ชนิด)' },
+        { key: 'lastVaccineDate', label: 'เข็มสุดท้ายได้รับเมื่อวันที่', type: 'date' }
+    ];
+    let editingRosterId = null;
+    const defaultRosterSeedBase64 = 'QS0wMXzguJ7guKXguK984LiB4Lik4Lip4LiB4LijfOC5geC4quC4h+C5g+C4quC5geC4geC5ieC4p3wxCkEtMDJ84Lie4Lil4LivfOC4iuC4ouC4suC4meC4seC4meC4leC5jHzguILguIjguLTguJXguKrguLjguKfguKPguKPguJN8MQpBLTAzfOC4nuC4peC4r3zguK3guJnguLjguKrguKPguJPguYx84Lia4Lix4Lin4LiX4Lit4LiHfDEKQS0wNHzguJ7guKXguK984Liq4Li04LiY4LijfOC4iOC4reC4oeC4nuC4h+C4qeC5jHwxCkEtMDV84Lie4Lil4LivfOC4meC4nuC5gOC4geC5ieC4snzguYLguJ7guJjguLTguKPguLHguIHguKnguYx8MQpBLTA2fOC4nuC4peC4r3zguJ7guLHguKrguIHguKN84Liq4Lij4Lij4Lie4Liq4Liy4LijfDEKQS0wN3zguJ7guKXguK984LiY4LiZ4LmA4LiU4LiKfOC4iuC5ieC4suC4h+C4iOC4seC4meC4l+C4o+C5jHwxCkEtMDh84Lie4Lil4LivfOC4m+C4geC4o+C4k+C5jHzguJTguYnguKfguIfguKrguIfguITguYx8MQpBLTA5fOC4nuC4peC4r3zguKfguLjguJLguJjguLTguJ7guLHguJXguKN84Lih4Lix4LiH4LiE4Liw4Lil4LiwfDEKQS0xMHzguJ7guKXguK984LiY4Lij4Lij4Lih4LiZ4Li54LiNfOC4nuC4tuC5iOC4h+C4nuC4p+C4gXwxCkEtMTF84Lie4Lil4LivfOC4o+C4seC4leC4meC4iuC4seC4onzguIrguJTguYDguIrguKJ8MQpBLTEyfOC4nuC4peC4r3zguJnguJnguJfguIHguLLguJnguJXguYx84LiI4Lix4LiZ4LiX4Lij4LmM4LivfDEKQS0xM3zguJ7guKXguK984LiZ4LiZ4LiX4Lig4Lix4LiX4LijfOC4reC5iOC4s+C5gOC4reC4teC5iOC4ouC4oXwxCkEtMTR84Lie4Lil4LivfOC5gOC4iOC4qeC4juC4snzguIjguLXguJnguYHguIjguYnguId8MQpBLTE1fOC4nuC4peC4r3zguK3guKPguKPguJbguJ7guKV84Lir4LiH4Liq4Li44Lin4Lij4Lij4LiT4LmMfDEKQS0xNnzguJ7guKXguK984LiZ4Lin4Lig4Li54Lih4Li0fOC4quC4uOC4hOC4o+C4teC4nnwxCkEtMTd84Lie4Lil4LivfOC4oOC4ueC4oeC4tOC4nuC4seC4kuC4meC5jHzguYDguITguJnguIHguLjguJTguKPguLHguId8MQpBLTE4fOC4nuC4peC4r3zguIjguLHguIHguKPguLV84LiZ4Liy4Lih4Lin4Lix4LiZfDEKQS0xOXzguJ7guKXguK984Lib4Lij4Li04LiN4LiN4LiyfOC4l+C4reC4h+C5g+C4mnwxCkEtMjB84Lie4Lil4LivfOC4o+C4seC4iuC4leC4mOC4o3zguYHguIvguYjguYDguK3guLXguYjguKLguKd8MQpBLTIxfOC4nuC4peC4r3zguKHguIfguITguKV84LmA4LiI4LmJ4Liy4Liq4Li44Lin4Lij4Lij4LiTfDEKQS0yMnzguJ7guKXguK984LiI4Li04Lij4Liy4Lii4Li4fOC5geC4iOC5iOC4oeC4p+C4h+C4hOC5jHwxCkEtMjN84Lie4Lil4LivfOC4iuC4tOC4meC4p+C4seC4leC4o3zguIrguLDguKHguLLguKPguLHguKHguKLguYx8MQpBLTI0fOC4nuC4peC4r3zguJjguJnguLLguIHguKN84LiI4Lix4LiZ4LiX4Lij4LmM4LivfDEKQS0yNXzguJ7guKXguK984LiX4Lij4LiH4Lie4LilfOC4q+C4reC4oeC5gOC4q+C4peC4t+C4rXwxCkEtMjZ84Lie4Lil4LivfOC4p+C4o+C4tOC4meC4l+C4o3zguYHguKrguIfguJXguLDguKfguLHguJl8MQpBLTI3fOC4nuC4peC4r3zguJvguI/guLTguIHguKPguJPguYx84Lie4Lil4LiK4Liy4Lij4Li1fDEKQi0wMXzguJ7guKXguK984LiB4Lik4LiV4Lig4Liy4LiqfOC5gOC4q+C4peC5h+C4h+C4muC4s+C4o+C4uOC4h3wyCkItMDJ84Lie4Lil4LivfOC4mOC4meC4suC4hOC4suC4o3zguKXguLfguYnguK3guJvguKPguLDguKrguLTguJfguJjguLTguYx8MgpCLTAzfOC4nuC4peC4r3zguJjguLXguKPguYDguKHguJh84LmA4LiB4LiV4Li44LmA4Lih4LmJ4LiyfDIKQi0wNHzguJ7guKXguK984LiI4Li04Lij4Liy4Lii4Li4fOC4reC4uOC4lOC4l+C4snwyCkItMDV84Lie4Lil4LivfOC5gOC4iOC4qeC4juC4suC4nuC4pXzguK3guLjguJTguJfguLJ8MgpCLTA2fOC4nuC4peC4r3zguKrguLjguJvguKPguLXguIrguLJ84LmA4Liq4Lih4Lit4LmD4LiIfDIKQi0wN3zguJ7guKXguK984LmB4LiX4LiZ4LmE4LiX4LiifOC5geC4quC4meC5gOC4quC4meC4snwyCkItMDh84Lie4Lil4LivfOC4reC4suC4meC4uOC4oOC4suC4nnzguYDguITguLLguIfguLLguKF8MgpCLTA5fOC4nuC4peC4r3zguK3guIrguLTguKPguKfguLHguIp84Lit4Lig4Lix4Lii4Lie4Li04Lie4Lix4LiS4LiZ4LmMfDIKQi0xMHzguJ7guKXguK984LiY4Lin4Lix4LiK4LiK4Lix4LiifOC4p+C4h+C4qOC5jOC5geC4lOC4h3wyCkItMTF84Lie4Lil4LivfOC4reC4oOC4tOC4iuC4suC4leC4tHzguJrguLjguI3guYDguIHguLTguYjguId8MgpCLTEyfOC4nuC4peC4r3zguKrguLjguJjguLTguKHguJnguJXguYx84Liq4Li44Lig4Liy4LiefDIKQi0xM3zguJ7guKXguK984LiK4Lin4Lix4Lil4Lin4Li04LiX4Lii4LmMfOC4nOC4lOC4uOC4h+C4p+C4tOC4qOC4p+C5jHwyCkItMTR84Lie4Lil4LivfOC4o+C4seC4kOC4geC4o+C4k+C5jHzguIjguLHguJnguJfguLDguKfguLHguJl8MgpCLTE1fOC4nuC4peC4r3zguKjguLjguKDguYLguIrguIR84LiX4Lit4LiH4LiK4Liz4LiZ4Liy4LiNfDIKQi0xNnzguJ7guKXguK984LiY4LiZ4Lin4Lix4LiV4LiZ4LmMfOC4lOC4p+C4h+C4geC4o+C4sOC4iOC4suC4onwyCkItMTd84Lie4Lil4LivfOC4qOC4seC4geC4lOC5jOC4iuC4seC4onzguYLguKXguIHguJvguKPguLDguYLguITguJl8MgpCLTE4fOC4nuC4peC4r3zguKjguLjguKDguIHguKTguJV84Liq4LiU4LmE4LiY4Liq4LiHfDIKQi0xOXzguJ7guKXguK984Lio4Li04Lin4LiB4LijfOC4oeC4h+C4hOC4pXwyCkItMjB84Lie4Lil4LivfOC4iuC4tOC4leC4tOC4nuC4seC4l+C4mOC5jHzguJvguLLguJnguYDguIjguKPguLTguI18MgpCLTIxfOC4nuC4peC4r3zguJfguKPguIfguIrguLHguKJ84Lij4Li44LmI4LiH4Liq4Lin4LmI4Liy4LiHfDIKQi0yMnzguJ7guKXguK984Lin4Lij4Lin4Li44LiS4Li0fOC5gOC4nOC4t+C4reC4geC4reC4s+C5hOC4nnwyCkItMjN84Lie4Lil4LivfOC4p+C4tOC4l+C4p+C4seC4qnzguYDguKHguLfguK3guIfguKvguKHguLjguJR8MgpCLTI0fOC4nuC4peC4r3zguKPguIrguJV84LiU4LmJ4Lin4LiH4Liq4LiH4LiE4LmMfDIKQi0yNXzguJ7guKXguK984Lia4Li44LiN4Liq4Li34LiafOC5gOC4l+C4teC4ouC4oeC4nuC4tOC4l+C4seC4geC4qeC5jHwyCkItMjZ84Lie4Lil4LivfOC4p+C4uOC4kuC4tOC4nuC4h+C4qeC5jHzguYHguIvguYjguKXguLXguYl8MgpCLTI3fOC4nuC4peC4r3zguIHguLHguJnguJXguYzguJ7guLTguIjguLHguIHguKnguJPguYx84LmB4LiI4LmI4Lih4LivfDIKQy0wMXzguJ7guKXguK984LiK4Li44LiV4Li04Lie4LiZ4LiY4LmMfOC4l+C4o+C4h+C4pOC4l+C4mOC4tOC5jHwzCkMtMDJ84Lie4Lil4LivfOC4p+C4o+C4suC4p+C4uOC4mHzguK3guLjguJvguKrguLLguKN8MwpDLTAzfOC4nuC4peC4r3zguK3guKHguKPguYDguJfguJ584LiB4Lix4LiZ4Lir4Liw4Lia4Li44LiV4LijfDMKQy0wNHzguJ7guKXguK984LiY4Li14Lij4LiwfOC4geC4meC4tOC4qeC4kOC4sOC4quC4uOC4meC4l+C4o3wzCkMtMDV84Lie4Lil4LivfOC4nuC4teC4o+C4nuC4seC4kuC4meC5jHzguKrguLHguIfguKfguLLguKXguKLguYx8MwpDLTA2fOC4nuC4peC4r3zguK3guLTguJfguJjguLTguJ7guKV84Lia4Li44LiV4Lij4Lit4Li04LiZ4LiX4Lij4LmMfDMKQy0wN3zguJ7guKXguK984LiY4Li14Lij4LmA4Lih4LiYfOC5geC4geC5ieC4p+C4luC4suC4p+C4o3wzCkMtMDh84Lie4Lil4LivfOC4mOC4teC4o+C4qOC4suC4quC4meC4leC4tOC5jHzguKPguLHguKHguKHguLDguKjguLHguIHguJTguLTguYx8MwpDLTA5fOC4nuC4peC4r3zguJPguLHguJDguKfguLjguJLguLR84LiW4Li04LmI4Lih4LiV4Liw4LmA4LiE4Li14Lii4LiZfDMKQy0xMHzguJ7guKXguK984LmA4LiX4Li14Lii4LiZ4Lit4LiU4Li04Liq4LijfOC5gOC4meC4leC4tOC4mOC4meC4p+C4seC4kuC4meC5jHwzCkMtMTF84Lie4Lil4LivfOC4iuC4seC4ouC4o+C4seC4inzguKPguIjguJnguLLguIHguKN8MwpDLTEyfOC4nuC4peC4r3zguIjguJXguLjguJ7guKV84LiX4Lit4LiH4LiB4Lij4Liw4LiI4Liy4LiifDMKQy0xM3zguJ7guKXguK984Lig4Li54Lin4LiU4LilfOC4l+C4reC4h+C4l+C4seC4mnwzCkMtMTR84Lie4Lil4LivfOC4geC4pOC4qeC4k+C4sHzguJfguK3guIfguK3guKPguLjguJN8MwpDLTE1fOC4nuC4peC4r3zguIrguLHguKLguJ7guKN84LiX4Lit4LiH4Liq4Liw4Lit4Liy4LiUfDMKQy0xNnzguJ7guKXguK984Lio4Li04Lin4LiB4LijfOC4p+C4h+C4qOC5jOC4q+C4h+C4qeC5jHwzCkMtMTd84Lie4Lil4LivfOC4o+C4seC4kOC4geC4suC4meC4leC5jHzguKLguK3guJTguK3guLLguIh8MwpDLTE4fOC4nuC4peC4r3zguKvguKPguKPguKnguLJ84LmA4Lie4LiK4Lij4Lia4Lij4LihfDMKQy0xOXzguJ7guKXguK984LiK4LiZ4Liw4Lie4LiH4Lio4LmMfOC4quC4seC4h+C4guC5jOC4m+C4peC4t+C5ieC4oXwzCkMtMjB84Lie4Lil4LivfOC4p+C4seC4iuC4o+C4sHzguJjguJnguLDguJvguKPguLDguKrguLTguJfguJjguLTguYx8MwpDLTIxfOC4nuC4peC4r3zguKLguIfguKLguLjguJfguJh84Lih4Li44LiI4Lij4Li04LiT4Lij4LmMfDMKQy0yMnzguJ7guKXguK984Lig4Liy4LiT4Li44Lie4LiH4Lip4LmMfOC4q+C4h+C4qeC5jHwzCkMtMjN84Lie4Lil4LivfOC4l+C4tOC4meC4oOC4seC4l+C4o3zguK3guLTguIfguIrguLHguKLguKDguLnguKHguLR8MwpDLTI0fOC4nuC4peC4r3zguJfguKPguIfguIrguLHguKJ84Liq4Li44Lin4Lij4Lij4LiT4LiK4Lix4Lii4Lij4LiafDMKQy0yNXzguJ7guKXguK984LiB4Lik4LiV4Lie4LilfOC4peC4s+C5gOC4nuC4ouC4nuC4pXwzCkMtMjZ84Lie4Lil4LivfOC4oOC4ueC4p+C4oeC4tOC4meC4l+C4o+C5jHzguIvguLjguKLguITguId8MwpDLTI3fOC4nuC4peC4r3zguK3guKDguLTguYDguIrguKnguJB84LmE4LiK4Lii4LmC4LiE4LiV4LijfDMKQy0yOHzguJ7guKXguK984LiB4Li04LiV4LiV4Li04LmE4LiK4LiifOC5geC4lOC4h+C4muC4uOC4jeC5gOC4o+C4t+C4reC4h3wzCkMtMjl84Lie4Lil4LivfOC4o+C4seC4kOC4geC4suC4meC4leC5jHzguKHguLLguIrguYjguKfguKJ8Mw==';
 
     // ตั้งค่าวันปัจจุบันให้กับหน้าควบคุม
     const today = new Date();
@@ -172,6 +632,323 @@
 
     // เรียกทำงานดึงและวาดกราฟทันทีเมื่อเปิดใช้งานหน้าจอ
     syncDashboardData();
+    initSoldierRoster();
+
+    function initSoldierRoster() {
+        const form = document.getElementById('rosterForm');
+        form.innerHTML = rosterFields.map(field => {
+            const type = field.type || 'text';
+            const className = type === 'checkbox' ? 'roster-field checkbox-field' : 'roster-field';
+            const control = type === 'select'
+                ? `<select id="roster_${field.key}" name="${field.key}">
+                        <option value="">-- เลือก --</option>
+                        ${field.options.map(option => `<option value="${option.value}">${option.label}</option>`).join('')}
+                   </select>`
+                : `<input
+                        type="${type}"
+                        id="roster_${field.key}"
+                        name="${field.key}"
+                        ${type === 'number' ? 'min="0" step="0.1"' : ''}
+                    >`;
+
+            return `
+                <div class="${className}">
+                    <label for="roster_${field.key}">${field.label}</label>
+                    ${control}
+                </div>
+            `;
+        }).join('');
+
+        document.getElementById('rosterHeadRow').innerHTML = `
+            <th>จัดการ</th>
+            ${rosterFields.map(field => `<th>${field.label}</th>`).join('')}
+        `;
+        if (getRosterRecords().length === 0) {
+            importDefaultRoster(false);
+        } else {
+            renderRosterTable();
+        }
+    }
+
+    function getDefaultRosterSeed() {
+        const bytes = Uint8Array.from(atob(defaultRosterSeedBase64), char => char.charCodeAt(0));
+        const text = new TextDecoder('utf-8').decode(bytes);
+        return text.split('\n').filter(Boolean).map(line => {
+            const [unit, rank, firstName, lastName, trainingGroup] = line.split('|');
+            return { unit, rank, firstName, lastName, trainingGroup };
+        });
+    }
+
+    function importDefaultRoster(showAlert = true) {
+        const records = getRosterRecords();
+        const existingKeys = new Set(records.map(record => `${record.unit}|${record.firstName}|${record.lastName}`));
+        const imported = [];
+
+        getDefaultRosterSeed().forEach(seed => {
+            const key = `${seed.unit}|${seed.firstName}|${seed.lastName}`;
+            if (!existingKeys.has(key)) {
+                imported.push({ id: `default_${seed.unit}_${Date.now()}_${imported.length}`, ...seed });
+                existingKeys.add(key);
+            }
+        });
+
+        if (imported.length > 0) {
+            setRosterRecords([...records, ...imported]);
+        }
+
+        renderRosterTable();
+        if (showAlert) alert(`ดึงรายชื่อเดิมเพิ่มแล้ว ${imported.length} รายชื่อ`);
+    }
+
+    function normalizeHeader(value) {
+        return String(value || '')
+            .replace(/System\.Xml\.XmlElement/g, '')
+            .replace(/[\s\u00a0().\-_/]/g, '')
+            .toLowerCase();
+    }
+
+    function readExcelCell(row, aliases) {
+        const normalizedAliases = aliases.map(normalizeHeader);
+        for (const key of Object.keys(row)) {
+            const normalizedKey = normalizeHeader(key);
+            if (normalizedAliases.some(alias => normalizedKey === alias || normalizedKey.includes(alias))) {
+                return String(row[key] || '').replace(/System\.Xml\.XmlElement/g, ' ').replace(/\s+/g, ' ').trim();
+            }
+        }
+        return '';
+    }
+
+    function isCheckedExcelValue(value) {
+        const text = String(value || '').trim().toLowerCase();
+        return ['ใช่', 'yes', 'y', 'true', '1', '✓', '/'].includes(text);
+    }
+
+    function buildRosterRecordFromExcelRow(row) {
+        const record = {
+            rank: readExcelCell(row, ['ยศ']),
+            firstName: readExcelCell(row, ['ชื่อ']),
+            lastName: readExcelCell(row, ['สกุล']),
+            unit: readExcelCell(row, ['หน่วย']) || readExcelCell(row, ['รหัส']),
+            trainingGroup: readExcelCell(row, ['หมวด']).replace(/[^123]/g, ''),
+            citizenId: readExcelCell(row, ['เลขบัตรประจำตัวประชาชน']),
+            birthDate: readExcelCell(row, ['วัน เดือน ปีเกิด', 'วดป.เกิด']),
+            hometown: readExcelCell(row, ['ภูมิลำเนา']),
+            district: readExcelCell(row, ['เขต/อำเภอ', 'อำเภอ']),
+            province: readExcelCell(row, ['จังหวัด']),
+            fatherFirstName: readExcelCell(row, ['ชื่อบิดา']),
+            fatherLastName: readExcelCell(row, ['สกุลบิดา']),
+            motherFirstName: readExcelCell(row, ['ชื่อมารดา']),
+            motherLastName: readExcelCell(row, ['สกุลมารดา']),
+            education: readExcelCell(row, ['การศึกษา']),
+            religion: readExcelCell(row, ['ศาสนา']),
+            weight: readExcelCell(row, ['น้ำหนัก']),
+            height: readExcelCell(row, ['ส่วนสูง']),
+            selectOnline: isCheckedExcelValue(readExcelCell(row, ['คัดเลือกแบบสมัครออนไลน์', 'วิธีการคัดเลือก [คัดเลือกแบบสมัครออนไลน์]'])),
+            selectRequest: isCheckedExcelValue(readExcelCell(row, ['คัดเลือกแบบร้องขอ', 'วิธีการคัดเลือก [คัดเลือกแบบร้องขอ]'])),
+            selectLottery: isCheckedExcelValue(readExcelCell(row, ['คัดเลือกแบบจับฉลาก', 'วิธีการคัดเลือก [คัดเลือกแบบจับฉลาก]'])),
+            selectAvoid: isCheckedExcelValue(readExcelCell(row, ['คัดเลือกแบบหลีกเลี่ยง', 'วิธีการคัดเลือก [คัดเลือกแบบหลีกเลี่ยง]'])),
+            disease: readExcelCell(row, ['โรคประจำตัว', 'โรคประจำตัว (ระบุโรค)']),
+            covidVaccine1: readExcelCell(row, ['วัคซีนโควิด-19เข็มที่1(ชนิด)', 'เข็มที่1']),
+            covidVaccine2: readExcelCell(row, ['วัคซีนโควิด-19เข็มที่2(ชนิด)', 'เข็มที่2']),
+            covidVaccine3: readExcelCell(row, ['วัคซีนโควิด-19เข็มที่3(ชนิด)', 'เข็มที่3']),
+            covidVaccine4: readExcelCell(row, ['วัคซีนโควิด-19เข็มที่4(ชนิด)', 'เข็มที่4']),
+            lastVaccineDate: readExcelCell(row, ['เข็มสุดท้ายได้รับเมื่อวันที่'])
+        };
+
+        return record;
+    }
+
+    function rosterDuplicateKey(record) {
+        if (record.citizenId) return `id:${record.citizenId}`;
+        return `name:${record.rank}|${record.firstName}|${record.lastName}`;
+    }
+
+    function mergeRosterRecord(existing, incoming) {
+        const merged = { ...existing };
+        rosterFields.forEach(field => {
+            if (field.type === 'checkbox') {
+                merged[field.key] = Boolean(existing[field.key] || incoming[field.key]);
+            } else if (incoming[field.key]) {
+                merged[field.key] = incoming[field.key];
+            }
+        });
+        if (!incoming.trainingGroup && existing.trainingGroup) merged.trainingGroup = existing.trainingGroup;
+        return merged;
+    }
+
+    async function importRosterExcel(event) {
+        const file = event.target.files && event.target.files[0];
+        event.target.value = '';
+        if (!file) return;
+        if (!window.XLSX) {
+            alert('ไม่สามารถโหลดตัวอ่านไฟล์ Excel ได้ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+            return;
+        }
+
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: false });
+        const records = getRosterRecords();
+        const indexByKey = new Map(records.map((record, index) => [rosterDuplicateKey(record), index]));
+        let added = 0;
+        let updated = 0;
+
+        workbook.SheetNames.forEach(sheetName => {
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+            rows.forEach(row => {
+                const incoming = buildRosterRecordFromExcelRow(row);
+                if (!incoming.firstName && !incoming.lastName && !incoming.citizenId) return;
+
+                const key = rosterDuplicateKey(incoming);
+                if (indexByKey.has(key)) {
+                    const index = indexByKey.get(key);
+                    records[index] = mergeRosterRecord(records[index], incoming);
+                    updated++;
+                } else {
+                    const record = { id: `excel_${Date.now()}_${added}`, ...incoming };
+                    records.push(record);
+                    indexByKey.set(key, records.length - 1);
+                    added++;
+                }
+            });
+        });
+
+        setRosterRecords(records);
+        renderRosterTable();
+        alert(`นำเข้า Excel สำเร็จ: เพิ่ม ${added} รายชื่อ, อัปเดต ${updated} รายชื่อ`);
+    }
+
+    function getRosterRecords() {
+        const raw = localStorage.getItem(rosterStorageKey);
+        return raw ? JSON.parse(raw) : [];
+    }
+
+    function setRosterRecords(records) {
+        localStorage.setItem(rosterStorageKey, JSON.stringify(records));
+    }
+
+    function getRosterFormData() {
+        const record = {};
+        rosterFields.forEach(field => {
+            const input = document.getElementById(`roster_${field.key}`);
+            record[field.key] = field.type === 'checkbox' ? input.checked : input.value.trim();
+        });
+        return record;
+    }
+
+    function saveRosterRecord() {
+        const record = getRosterFormData();
+        const hasName = record.firstName || record.lastName || record.citizenId;
+        if (!hasName) {
+            alert('กรุณากรอกอย่างน้อย ชื่อ สกุล หรือเลขบัตรประจำตัวประชาชน');
+            return;
+        }
+
+        const records = getRosterRecords();
+        if (editingRosterId) {
+            const index = records.findIndex(item => item.id === editingRosterId);
+            if (index !== -1) records[index] = { ...records[index], ...record };
+        } else {
+            records.push({ id: `soldier_${Date.now()}`, ...record });
+        }
+
+        setRosterRecords(records);
+        resetRosterForm();
+        renderRosterTable();
+    }
+
+    function resetRosterForm() {
+        editingRosterId = null;
+        rosterFields.forEach(field => {
+            const input = document.getElementById(`roster_${field.key}`);
+            if (input) {
+                if (field.type === 'checkbox') input.checked = false;
+                else input.value = '';
+            }
+        });
+    }
+
+    function editRosterRecord(id) {
+        const record = getRosterRecords().find(item => item.id === id);
+        if (!record) return;
+        editingRosterId = id;
+        rosterFields.forEach(field => {
+            const input = document.getElementById(`roster_${field.key}`);
+            if (input) {
+                if (field.type === 'checkbox') input.checked = Boolean(record[field.key]);
+                else input.value = record[field.key] || '';
+            }
+        });
+        document.getElementById('rosterTitle').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function deleteRosterRecord(id) {
+        if (!confirm('ต้องการลบรายชื่อนี้หรือไม่?')) return;
+        const records = getRosterRecords().filter(item => item.id !== id);
+        setRosterRecords(records);
+        if (editingRosterId === id) resetRosterForm();
+        renderRosterTable();
+    }
+
+    function renderRosterTable() {
+        const keyword = document.getElementById('rosterSearch').value.trim().toLowerCase();
+        const records = getRosterRecords();
+        const filtered = records.filter(record => {
+            if (!keyword) return true;
+            return rosterFields.some(field => String(record[field.key] || '').toLowerCase().includes(keyword));
+        });
+
+        document.getElementById('rosterCount').textContent = `${filtered.length} รายชื่อ`;
+        document.getElementById('rosterBody').innerHTML = filtered.map(record => `
+            <tr>
+                <td>
+                    <div class="roster-row-actions">
+                        <button class="roster-btn muted" type="button" onclick="editRosterRecord('${record.id}')">แก้ไข</button>
+                        <button class="roster-btn danger" type="button" onclick="deleteRosterRecord('${record.id}')">ลบ</button>
+                    </div>
+                </td>
+                ${rosterFields.map(field => `<td>${formatRosterValue(record, field)}</td>`).join('')}
+            </tr>
+        `).join('') || `<tr><td colspan="${rosterFields.length + 1}" style="text-align:center; color:#64748b;">ยังไม่มีข้อมูลรายชื่อทหาร</td></tr>`;
+    }
+
+    function formatRosterValue(record, field) {
+        if (field.type === 'checkbox') return record[field.key] ? '✓' : '';
+        return escapeHtml(record[field.key] || '');
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function exportRosterCsv() {
+        const rows = getRosterRecords();
+        if (!rows.length) {
+            alert('ยังไม่มีข้อมูลสำหรับส่งออก');
+            return;
+        }
+
+        const header = rosterFields.map(field => field.label);
+        const body = rows.map(record => rosterFields.map(field => {
+            const value = field.type === 'checkbox' ? (record[field.key] ? '1' : '') : (record[field.key] || '');
+            return `"${String(value).replaceAll('"', '""')}"`;
+        }).join(','));
+        const csv = '\uFEFF' + [header.map(label => `"${label}"`).join(','), ...body].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'soldier-roster.csv';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    }
 
     function syncDashboardData() {
         const targetDate = document.getElementById('dashDate').value;
@@ -291,5 +1068,185 @@
         });
     }
 </script>
+
+<!-- 🎖️ SECTION: จัดการรายชื่อทหาร -->
+<script>
+    // ตัวแปรสำหรับจัดการรายชื่อ
+    let editingDatabase = null;
+    let currentEditGroup = null;
+
+    function openSoldierManager() {
+        const storedDB = localStorage.getItem('soldier_database');
+        editingDatabase = storedDB ? JSON.parse(storedDB) : 
+            {
+                '1': ["A-01 พลฯ กฤษกร แสงใสแก้ว", "A-02 พลฯ ชยานันต์ ขจิตสุวรรณ"],
+                '2': ["B-01 พลฯ กฤตภาส เหล็งบำรุง"],
+                '3': ["C-01 พลฯ ชุติพนธ์ ทรงฤทธิ์"]
+            };
+        
+        currentEditGroup = '1';
+        showSoldierEditorUI();
+    }
+
+    function showSoldierEditorUI() {
+        if (!editingDatabase) return;
+        
+        let html = `
+            <div class="modal-overlay">
+                <div class="modal-content">
+                    <h2>📝 จัดการรายชื่อทหารใหม่</h2>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
+        `;
+        
+        ['1', '2', '3'].forEach(group => {
+            const groupName = group === '1' ? 'หมวด ๑' : group === '2' ? 'หมวด ๒' : 'หมวด ๓';
+            const isActive = group === currentEditGroup;
+            const activeStyle = isActive ? 'background: linear-gradient(135deg, #0f766e, #0d9488); color: white; border-color: transparent;' : '';
+            html += `
+                <button onclick="currentEditGroup='${group}'; showSoldierEditorUI();" 
+                    class="modal-button" style="${activeStyle}">
+                    ${groupName}
+                </button>
+            `;
+        });
+        
+        html += `
+                    </div>
+
+                    <div style="background: #f0f9f8; padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #a7dbd8;">
+                        <button onclick="document.getElementById('excelUpload').click();" 
+                            class="modal-button primary" style="width: 100%; padding: 10px;">
+                            📤 นำเข้าจาก Excel (ไฟล์ .xlsx)
+                        </button>
+                        <input type="file" id="excelUpload" accept=".xlsx,.xls" onchange="importExcelFile(event);" style="display: none;">
+                        <small style="color: #64748b; display: block; margin-top: 6px;">
+                            ⚠️ Excel ต้องมี 4 คอลัมน์: รหัส | ยศ | ชื่อ | สกุล
+                        </small>
+                    </div>
+                    
+                    <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #f9fcfd; max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
+        `;
+        
+        editingDatabase[currentEditGroup].forEach((name, idx) => {
+            html += `
+                <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
+                    <input type="text" value="${name}" onchange="editingDatabase['${currentEditGroup}'][${idx}] = this.value;" 
+                        style="flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px;">
+                    <button onclick="editingDatabase['${currentEditGroup}'].splice(${idx}, 1); showSoldierEditorUI();" 
+                        class="modal-button danger" style="padding: 6px 12px; font-size: 13px;">ลบ</button>
+                </div>
+            `;
+        });
+        
+        html += `
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <input type="text" id="newSoldierName" placeholder="เพิ่มรายชื่อใหม่ เช่น A-28 พลฯ ชื่อ นามสกุล" 
+                            style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px;">
+                        <button onclick="addNewSoldier();" class="modal-button primary">เพิ่มชื่อ</button>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button onclick="closeEditUI();" class="modal-button">ยกเลิก</button>
+                        <button onclick="saveSoldierDatabase();" class="modal-button primary">💾 บันทึก</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const modal = document.createElement('div');
+        modal.id = 'soldierEditModal';
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+    }
+
+    function importExcelFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                // เพิ่มรายชื่อใหม่โดยไม่ลบรายชื่อเดิม
+                let addedCount = 0;
+                
+                rows.forEach((row, idx) => {
+                    if (idx === 0) return; // ข้ามหัวเรื่อง
+                    if (!row[0] || row.filter(v => v).length === 0) return; // ข้ามแถวว่าง
+                    
+                    const code = String(row[0] || '').trim();
+                    const rank = String(row[1] || '').trim();
+                    const firstName = String(row[2] || '').trim();
+                    const lastName = String(row[3] || '').trim();
+                    
+                    if (code && firstName) {
+                        const fullName = `${code}${rank ? ' ' + rank : ''} ${firstName}${lastName ? ' ' + lastName : ''}`;
+                        editingDatabase[currentEditGroup].push(fullName);
+                        addedCount++;
+                    }
+                });
+
+                if (addedCount > 0) {
+                    alert(`✅ เพิ่ม ${addedCount} รายชื่อใหม่สำเร็จ (รวมรายชื่อเดิม ${editingDatabase[currentEditGroup].length - addedCount} รายชื่อ)`);
+                    showSoldierEditorUI();
+                } else {
+                    alert('❌ ไม่พบข้อมูลที่ถูกต้องในไฟล์ Excel');
+                }
+            } catch (err) {
+                alert('❌ เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function addNewSoldier() {
+        const input = document.getElementById('newSoldierName');
+        if (input.value.trim()) {
+            editingDatabase[currentEditGroup].push(input.value.trim());
+            input.value = '';
+            showSoldierEditorUI();
+        }
+    }
+
+    function saveSoldierDatabase() {
+        localStorage.setItem('soldier_database', JSON.stringify(editingDatabase));
+        alert('✅ บันทึกรายชื่อทหารสำเร็จแล้ว!');
+        closeEditUI();
+        location.reload(); // รีโหลดเพื่อให้ index.html อัปเดต
+    }
+
+    function closeEditUI() {
+        const modal = document.getElementById('soldierEditModal');
+        if (modal) modal.remove();
+    }
+
+    // เพิ่มปุ่มแก้ไขรายชื่อใน header
+    document.addEventListener('DOMContentLoaded', function() {
+        const headerDiv = document.querySelector('.header');
+        if (headerDiv && !document.getElementById('editSoldierBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'editSoldierBtn';
+            btn.textContent = '👥 จัดการรายชื่อทหาร';
+            btn.onclick = openSoldierManager;
+            btn.style.cssText = `
+                background-color: #2563eb; color: white; border: none;
+                padding: 10px 16px; font-size: 14px; font-weight: 600;
+                border-radius: 4px; cursor: pointer; transition: background 0.2s;
+            `;
+            btn.onmouseover = () => btn.style.background = '#1d4ed8';
+            btn.onmouseout = () => btn.style.background = '#2563eb';
+            headerDiv.appendChild(btn);
+        }
+    });
+</script>
+
 </body>
 </html>
