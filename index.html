@@ -571,6 +571,8 @@
     }
 
     let database = getDatabase();
+    let usingRemoteDatabase = false;
+    let soldierDbIds = { '1': [], '2': [], '3': [] };
     let sessionData = { M: {}, A: {}, E: {} };
     let activeTime = 'M';
     let activeGroup = '1';
@@ -583,8 +585,67 @@
         document.getElementById('reportDate').value = `${year}-${month}-${day}`;
     }
 
-    initCurrentDate();
-    loadDateData();
+    initApp();
+
+    async function initApp() {
+        initCurrentDate();
+        await loadSoldiersFromDatabase();
+        await loadDateData();
+    }
+
+    function normalizeGroup(value) {
+        const group = String(value || '1').replace(/[^123]/g, '');
+        return group === '2' || group === '3' ? group : '1';
+    }
+
+    function getSoldierLabel(row) {
+        const code = row.soldier_code || row.code || '';
+        const fullName = row.full_name || row.name || [row.first_name, row.last_name].filter(Boolean).join(' ');
+        return [code, row.rank || '', fullName].filter(Boolean).join(' ').trim() || code || String(row.id || row.soldier_id || '');
+    }
+
+    async function loadSoldiersFromDatabase() {
+        try {
+            const response = await fetch('soldiers.php', { cache: 'no-store' });
+            if (!response.ok) throw new Error('Cannot load soldiers');
+
+            const rows = await response.json();
+            if (!Array.isArray(rows) || rows.length === 0) return;
+
+            const nextDatabase = { '1': [], '2': [], '3': [] };
+            const nextIds = { '1': [], '2': [], '3': [] };
+
+            rows.forEach((row, idx) => {
+                const group = normalizeGroup(row.training_group || row.group_id || row.group_no || row.group);
+                nextDatabase[group].push(getSoldierLabel(row));
+                nextIds[group].push(String(row.id || row.soldier_id || `${group}_${idx}`));
+            });
+
+            if (Object.values(nextDatabase).some(groupRows => groupRows.length > 0)) {
+                database = nextDatabase;
+                soldierDbIds = nextIds;
+                usingRemoteDatabase = true;
+            }
+        } catch (error) {
+            console.warn('Using local soldier list because database roster failed:', error);
+        }
+    }
+
+    function getSoldierRecordId(group, idx) {
+        return soldierDbIds[group] && soldierDbIds[group][idx] ? soldierDbIds[group][idx] : `${group}_${idx}`;
+    }
+
+    function getSoldierIndexByRecordId(group, id) {
+        const ids = soldierDbIds[group] || [];
+        const found = ids.findIndex(value => String(value) === String(id));
+        if (found >= 0) return found;
+        const fallbackIndex = String(id).split('_')[1];
+        return Number.isInteger(Number(fallbackIndex)) ? Number(fallbackIndex) : -1;
+    }
+
+    function getTotalSoldiers() {
+        return Object.values(database).reduce((total, groupRows) => total + groupRows.length, 0);
+    }
 
     // 🔒 ฟังก์ชันตรวจสอบรหัสผ่านสำหรับเข้าหน้า Admin Dashboard
     function checkAdminAccess() {
@@ -596,10 +657,34 @@
         }
     }
 
-    function loadDateData() {
+    async function loadDateData() {
         const dateKey = document.getElementById('reportDate').value;
-        const saved = localStorage.getItem(`urine_med_data_${dateKey}`);
-        sessionData = saved ? JSON.parse(saved) : { M: {}, A: {}, E: {} };
+        sessionData = { M: {}, A: {}, E: {} };
+
+        if (usingRemoteDatabase) {
+            try {
+                const response = await fetch(`get_data.php?date=${encodeURIComponent(dateKey)}`, { cache: 'no-store' });
+                if (!response.ok) throw new Error('Cannot load records');
+
+                const rows = await response.json();
+                if (Array.isArray(rows)) {
+                    rows.forEach(row => {
+                        const time = row.record_time;
+                        if (sessionData[time]) {
+                            sessionData[time][String(row.soldier_id)] = Number(row.urine_level);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.warn('Using local records because database records failed:', error);
+                const saved = localStorage.getItem(`urine_med_data_${dateKey}`);
+                sessionData = saved ? JSON.parse(saved) : { M: {}, A: {}, E: {} };
+            }
+        } else {
+            const saved = localStorage.getItem(`urine_med_data_${dateKey}`);
+            sessionData = saved ? JSON.parse(saved) : { M: {}, A: {}, E: {} };
+        }
+
         renderRows();
         updateDashboard();
     }
@@ -607,6 +692,25 @@
     function saveData() {
         const dateKey = document.getElementById('reportDate').value;
         localStorage.setItem(`urine_med_data_${dateKey}`, JSON.stringify(sessionData));
+    }
+
+    async function saveRecord(id, level) {
+        const dateKey = document.getElementById('reportDate').value;
+        const response = await fetch('save_data.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                soldier_id: id,
+                record_date: dateKey,
+                record_time: activeTime,
+                urine_level: level
+            })
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.status !== 'success') {
+            throw new Error(result.message || 'Cannot save record');
+        }
     }
 
     function switchTime(time) {
@@ -631,7 +735,7 @@
         const tbody = document.getElementById('soldierRows');
         tbody.innerHTML = '';
         database[activeGroup].forEach((name, idx) => {
-            const soldierID = `${activeGroup}_${idx}`;
+            const soldierID = getSoldierRecordId(activeGroup, idx);
             const soldierCode = name.split(' ')[0] || name;
             const selectedLevel = sessionData[activeTime][soldierID] !== undefined ? sessionData[activeTime][soldierID] : null;
 
@@ -668,9 +772,17 @@
         } else {
             sessionData[activeTime][id] = level;
         }
-        saveData();
         updateDashboard();
         updateRowSelection(id, level);
+
+        if (usingRemoteDatabase) {
+            saveRecord(id, level).catch(error => {
+                console.error(error);
+                alert('บันทึกข้อมูลลงฐานข้อมูลไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล');
+            });
+        } else {
+            saveData();
+        }
     }
 
     function selectColor(element, id, level) {
@@ -705,7 +817,7 @@
 
     function openColorPickerModal(id, currentLevel) {
         closeColorPickerModal();
-        const nameIndex = Number(id.split('_')[1]);
+        const nameIndex = getSoldierIndexByRecordId(activeGroup, id);
         const soldierName = database[activeGroup][nameIndex] || '';
         const modal = document.createElement('div');
         modal.id = 'colorPickerModal';
@@ -756,7 +868,7 @@
                 if(currentData[id] === 4) c4++;
             }
         }
-        document.getElementById('dashTotal').textContent = `${checked} / 83`;
+        document.getElementById('dashTotal').textContent = `${checked} / ${getTotalSoldiers()}`;
         document.getElementById('dashC0').textContent = c0; document.getElementById('dashC1').textContent = c1; 
         document.getElementById('dashC2').textContent = c2; document.getElementById('dashC3').textContent = c3; 
         document.getElementById('dashC4').textContent = c4;
@@ -823,7 +935,7 @@
                 `;
 
             database[g].forEach((name, idx) => {
-                let id = `${g}_${idx}`;
+                let id = getSoldierRecordId(g, idx);
                 let rM = sessionData.M[id] !== undefined ? `class="lc${sessionData.M[id]}"` : '';
                 let rA = sessionData.A[id] !== undefined ? `class="lc${sessionData.A[id]}"` : '';
                 let rE = sessionData.E[id] !== undefined ? `class="lc${sessionData.E[id]}"` : '';
@@ -846,7 +958,7 @@
 
             let m0=0,m1=0,m2=0,m3=0,m4=0, a0=0,a1=0,a2=0,a3=0,a4=0, e0=0,e1=0,e2=0,e3=0,e4=0;
             database[g].forEach((_, idx) => {
-                let id = `${g}_${idx}`;
+                let id = getSoldierRecordId(g, idx);
                 if(sessionData.M[id]===0) m0++; if(sessionData.M[id]===1) m1++; if(sessionData.M[id]===2) m2++; if(sessionData.M[id]===3) m3++; if(sessionData.M[id]===4) m4++;
                 if(sessionData.A[id]===0) a0++; if(sessionData.A[id]===1) a1++; if(sessionData.A[id]===2) a2++; if(sessionData.A[id]===3) a3++; if(sessionData.A[id]===4) a4++;
                 if(sessionData.E[id]===0) e0++; if(sessionData.E[id]===1) e1++; if(sessionData.E[id]===2) e2++; if(sessionData.E[id]===3) e3++; if(sessionData.E[id]===4) e4++;

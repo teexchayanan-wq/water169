@@ -588,6 +588,7 @@
     // ประกาศตัวแปรจองพื้นที่ออบเจกต์ของโครงสร้างกราฟป้องกันการวาดทับซ้ำผิดพลาด
     let barChartInstance = null;
     let pieChartInstance = null;
+    let dashboardRefreshTimer = null;
     const rosterStorageKey = 'soldier_roster_records_v1';
     const rosterFields = [
         { key: 'rank', label: 'ยศ' },
@@ -632,7 +633,18 @@
 
     // เรียกทำงานดึงและวาดกราฟทันทีเมื่อเปิดใช้งานหน้าจอ
     syncDashboardData();
+    startDashboardAutoRefresh();
     initSoldierRoster();
+
+    function startDashboardAutoRefresh() {
+        if (dashboardRefreshTimer) clearInterval(dashboardRefreshTimer);
+        dashboardRefreshTimer = setInterval(syncDashboardData, 5000);
+
+        window.addEventListener('focus', syncDashboardData);
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) syncDashboardData();
+        });
+    }
 
     function initSoldierRoster() {
         const form = document.getElementById('rosterForm');
@@ -950,9 +962,9 @@
         URL.revokeObjectURL(url);
     }
 
-    function syncDashboardData() {
+    async function syncDashboardData() {
         const targetDate = document.getElementById('dashDate').value;
-        const rawData = localStorage.getItem(`urine_med_data_${targetDate}`);
+        let rawData = null;
         
         // โครงสร้างเมทริกซ์เก็บรวบรวมค่าจำนวนสถิติสรุปส่งต่อให้กราฟ
         let stats = {
@@ -962,6 +974,33 @@
         };
 
         let g1_4 = 0, g2_4 = 0, g3_4 = 0;
+
+        try {
+            const response = await fetch(`get_data.php?date=${encodeURIComponent(targetDate)}`, { cache: 'no-store' });
+            if (!response.ok) throw new Error('Cannot load dashboard data');
+
+            const rows = await response.json();
+            if (Array.isArray(rows)) {
+                rows.forEach(row => {
+                    const time = row.record_time;
+                    const val = Number(row.urine_level);
+                    const group = String(row.group_id || '');
+
+                    if (stats[time] && stats[time][val] !== undefined) {
+                        stats[time][val]++;
+
+                        if (val === 4) {
+                            if (group === '1') g1_4++;
+                            if (group === '2') g2_4++;
+                            if (group === '3') g3_4++;
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn('Using local dashboard data because database records failed:', error);
+            rawData = localStorage.getItem(`urine_med_data_${targetDate}`);
+        }
 
         if (rawData) {
             const parsed = JSON.parse(rawData);
@@ -1006,10 +1045,130 @@
     }
 
     // ฟังก์ชันสร้างและควบคุมกราฟแท่ง (Multi-Dataset Bar Chart)
+    function prepareFallbackCanvas(canvasId) {
+        const canvas = document.getElementById(canvasId);
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(320, Math.floor(rect.width || canvas.parentElement.clientWidth || 640));
+        const height = Math.max(260, Math.floor(rect.height || canvas.parentElement.clientHeight || 320));
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, width, height);
+        ctx.font = '12px Segoe UI, Tahoma, sans-serif';
+        ctx.fillStyle = '#334155';
+        return { ctx, width, height };
+    }
+
+    function renderFallbackBarChart(stats) {
+        const { ctx, width, height } = prepareFallbackCanvas('barChart');
+        const labels = ['U0', 'U1', 'U2', 'U3', 'U4'];
+        const series = [
+            { key: 'M', label: 'Morning', color: '#0284c7' },
+            { key: 'A', label: 'Afternoon', color: '#1e293b' },
+            { key: 'E', label: 'Evening', color: '#0d9488' }
+        ];
+        const values = series.flatMap(item => labels.map((_, index) => stats[item.key][index]));
+        const maxValue = Math.max(1, ...values);
+        const left = 42;
+        const right = 18;
+        const top = 34;
+        const bottom = 48;
+        const chartW = width - left - right;
+        const chartH = height - top - bottom;
+        const groupW = chartW / labels.length;
+        const barW = Math.max(8, groupW / 5);
+
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.beginPath();
+        ctx.moveTo(left, top);
+        ctx.lineTo(left, top + chartH);
+        ctx.lineTo(width - right, top + chartH);
+        ctx.stroke();
+
+        labels.forEach((label, index) => {
+            const x = left + index * groupW + groupW / 2;
+            ctx.fillStyle = '#475569';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, x, height - 20);
+
+            series.forEach((item, sIndex) => {
+                const value = stats[item.key][index];
+                const barH = (value / maxValue) * (chartH - 10);
+                const barX = x - barW * 1.8 + sIndex * (barW + 3);
+                const barY = top + chartH - barH;
+                ctx.fillStyle = item.color;
+                ctx.fillRect(barX, barY, barW, barH);
+                if (value > 0) {
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillText(value, barX + barW / 2, barY - 5);
+                }
+            });
+        });
+
+        series.forEach((item, index) => {
+            const x = left + index * 110;
+            ctx.fillStyle = item.color;
+            ctx.fillRect(x, 12, 12, 12);
+            ctx.fillStyle = '#334155';
+            ctx.textAlign = 'left';
+            ctx.fillText(item.label, x + 18, 22);
+        });
+    }
+
+    function renderFallbackPieChart(c0, c1, c2, c3, c4) {
+        const { ctx, width, height } = prepareFallbackCanvas('pieChart');
+        const values = [c0, c1, c2, c3, c4];
+        const colors = ['#e0f2fe', '#16a34a', '#fca5a5', '#dc2626', '#7f1d1d'];
+        const labels = ['U0', 'U1', 'U2', 'U3', 'U4'];
+        const total = values.reduce((sum, value) => sum + value, 0);
+        const cx = width / 2;
+        const cy = height / 2 - 8;
+        const radius = Math.min(width, height) * 0.28;
+
+        if (total === 0) {
+            ctx.fillStyle = '#e2e8f0';
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#64748b';
+            ctx.textAlign = 'center';
+            ctx.fillText('No data', cx, cy + 4);
+            return;
+        }
+
+        let start = -Math.PI / 2;
+        values.forEach((value, index) => {
+            if (value <= 0) return;
+            const angle = (value / total) * Math.PI * 2;
+            ctx.fillStyle = colors[index];
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, radius, start, start + angle);
+            ctx.closePath();
+            ctx.fill();
+            start += angle;
+        });
+
+        labels.forEach((label, index) => {
+            const x = 24 + index * 58;
+            const y = height - 24;
+            ctx.fillStyle = colors[index];
+            ctx.fillRect(x, y - 10, 12, 12);
+            ctx.fillStyle = '#334155';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${label}: ${values[index]}`, x + 18, y);
+        });
+    }
+
     function renderBarChart(stats) {
         const ctx = document.getElementById('barChart').getContext('2d');
         
         if (barChartInstance) { barChartInstance.destroy(); }
+
+        if (typeof Chart === 'undefined') {
+            renderFallbackBarChart(stats);
+            return;
+        }
 
         barChartInstance = new Chart(ctx, {
             type: 'bar',
@@ -1039,6 +1198,11 @@
         const ctx = document.getElementById('pieChart').getContext('2d');
         
         if (pieChartInstance) { pieChartInstance.destroy(); }
+
+        if (typeof Chart === 'undefined') {
+            renderFallbackPieChart(c0, c1, c2, c3, c4);
+            return;
+        }
 
         // ป้องกันไม่ให้กราฟแหว่งถ้ายังไม่มีการลงข้อมูลตรวจเลยในวันนั้น
         let hasData = (c0 + c1 + c2 + c3 + c4) > 0;
@@ -1075,7 +1239,32 @@
     let editingDatabase = null;
     let currentEditGroup = null;
 
-    function openSoldierManager() {
+    async function openSoldierManager() {
+        editingDatabase = { '1': [], '2': [], '3': [] };
+
+        try {
+            const response = await fetch('soldiers.php', { cache: 'no-store' });
+            if (!response.ok) throw new Error('Cannot load soldiers');
+
+            const rows = await response.json();
+            if (Array.isArray(rows)) {
+                rows.forEach(row => {
+                    const group = String(row.group_id || row.training_group || '1');
+                    const targetGroup = editingDatabase[group] ? group : '1';
+                    const label = `${row.soldier_code || ''} ${row.full_name || ''}`.trim();
+                    if (label) editingDatabase[targetGroup].push(label);
+                });
+            }
+        } catch (error) {
+            console.warn('Using local soldier database because database roster failed:', error);
+            const storedDB = localStorage.getItem('soldier_database');
+            editingDatabase = storedDB ? JSON.parse(storedDB) : { '1': [], '2': [], '3': [] };
+        }
+
+        currentEditGroup = '1';
+        showSoldierEditorUI();
+        return;
+
         const storedDB = localStorage.getItem('soldier_database');
         editingDatabase = storedDB ? JSON.parse(storedDB) : 
             {
@@ -1216,7 +1405,29 @@
         }
     }
 
-    function saveSoldierDatabase() {
+    async function saveSoldierDatabase() {
+        try {
+            const response = await fetch('save_soldiers.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ groups: editingDatabase })
+            });
+
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(result.message || 'Cannot save soldiers');
+            }
+
+            alert(`บันทึกรายชื่อทหารลงฐานข้อมูลสำเร็จ ${result.saved || 0} รายการ`);
+            closeEditUI();
+            location.reload();
+            return;
+        } catch (error) {
+            console.error(error);
+            alert('บันทึกรายชื่อทหารลงฐานข้อมูลไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล');
+            return;
+        }
+
         localStorage.setItem('soldier_database', JSON.stringify(editingDatabase));
         alert('✅ บันทึกรายชื่อทหารสำเร็จแล้ว!');
         closeEditUI();
@@ -1245,6 +1456,248 @@
             btn.onmouseout = () => btn.style.background = '#2563eb';
             headerDiv.appendChild(btn);
         }
+    });
+</script>
+
+<script>
+    let soldierManagerState = { groups: { '1': [], '2': [], '3': [] }, activeGroup: '1' };
+
+    function escapeSoldierValue(value) {
+        return String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function normalizeSoldierGroup(value) {
+        const group = String(value || '1').replace(/[^123]/g, '');
+        return group === '2' || group === '3' ? group : '1';
+    }
+
+    function parseSoldierInput(value) {
+        const text = String(value || '').replace(/\s+/g, ' ').trim();
+        if (!text) return null;
+        const parts = text.split(' ');
+        const code = parts.shift() || '';
+        const fullName = parts.join(' ').trim();
+        if (!code || !fullName) return null;
+        return `${code} ${fullName}`;
+    }
+
+    async function openSoldierManager() {
+        soldierManagerState = { groups: { '1': [], '2': [], '3': [] }, activeGroup: '1' };
+        showSoldierManagerModal(true);
+
+        try {
+            const response = await fetch('soldiers.php', { cache: 'no-store' });
+            const rows = await response.json();
+            if (!response.ok || !Array.isArray(rows)) throw new Error('Cannot load soldiers');
+
+            rows.forEach(row => {
+                const group = normalizeSoldierGroup(row.group_id);
+                const label = `${row.soldier_code || ''} ${row.full_name || ''}`.replace(/\s+/g, ' ').trim();
+                if (label) soldierManagerState.groups[group].push(label);
+            });
+
+            showSoldierManagerModal(false);
+        } catch (error) {
+            console.error(error);
+            showSoldierManagerModal(false, 'โหลดรายชื่อจากฐานข้อมูลไม่สำเร็จ');
+        }
+    }
+
+    function showSoldierManagerModal(isLoading = false, errorMessage = '') {
+        closeEditUI();
+
+        const group = soldierManagerState.activeGroup;
+        const rows = soldierManagerState.groups[group] || [];
+        const groupButtons = ['1', '2', '3'].map(item => {
+            const active = item === group ? 'background:#0f766e;color:#fff;border-color:#0f766e;' : '';
+            return `<button type="button" class="modal-button" style="${active}" onclick="switchSoldierManagerGroup('${item}')">หมวด ${item}</button>`;
+        }).join('');
+
+        const rowHtml = isLoading
+            ? `<div style="padding:18px;text-align:center;color:#64748b;">กำลังโหลดรายชื่อจากฐานข้อมูล...</div>`
+            : rows.map((name, index) => `
+                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:10px;align-items:center;">
+                    <input
+                        type="text"
+                        value="${escapeSoldierValue(name)}"
+                        onchange="updateSoldierManagerName(${index}, this.value)"
+                        style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;"
+                    >
+                    <button type="button" class="modal-button danger" style="padding:8px 12px;" onclick="removeSoldierManagerName(${index})">ลบ</button>
+                </div>
+            `).join('') || `<div style="padding:18px;text-align:center;color:#64748b;">ยังไม่มีรายชื่อในหมวดนี้</div>`;
+
+        const modal = document.createElement('div');
+        modal.id = 'soldierEditModal';
+        modal.innerHTML = `
+            <div class="modal-overlay">
+                <div class="modal-content">
+                    <h2 style="margin-top:0;">จัดการรายชื่อพลทหาร</h2>
+                    <div style="color:#64748b;margin-bottom:14px;">ข้อมูลส่วนนี้เชื่อมต่อฐานข้อมูลตาราง soldiers โดยตรง</div>
+                    ${errorMessage ? `<div style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-bottom:12px;">${escapeSoldierValue(errorMessage)}</div>` : ''}
+
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+                        ${groupButtons}
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px;">
+                        <input
+                            id="newSoldierName"
+                            type="text"
+                            placeholder="เช่น A-28 พลฯ ชื่อ นามสกุล"
+                            style="padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;"
+                        >
+                        <button type="button" class="modal-button primary" onclick="addNewSoldier()">เพิ่มชื่อ</button>
+                    </div>
+
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:14px;">
+                        <button type="button" class="modal-button" style="width:100%;" onclick="document.getElementById('soldierExcelUpload').click()">นำเข้าจาก Excel</button>
+                        <input type="file" id="soldierExcelUpload" accept=".xlsx,.xls" onchange="importExcelFile(event)" style="display:none;">
+                        <div style="font-size:12px;color:#64748b;margin-top:6px;">รูปแบบคอลัมน์: รหัส | ยศ | ชื่อ | สกุล</div>
+                    </div>
+
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#ffffff;max-height:420px;overflow:auto;margin-bottom:16px;">
+                        ${rowHtml}
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                        <div style="color:#475569;font-weight:600;">ทั้งหมด ${rows.length} รายชื่อ</div>
+                        <div style="display:flex;gap:10px;">
+                            <button type="button" class="modal-button" onclick="closeEditUI()">ยกเลิก</button>
+                            <button type="button" class="modal-button primary" onclick="saveSoldierDatabase()">บันทึกลงฐานข้อมูล</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    function switchSoldierManagerGroup(group) {
+        soldierManagerState.activeGroup = normalizeSoldierGroup(group);
+        showSoldierManagerModal(false);
+    }
+
+    function updateSoldierManagerName(index, value) {
+        const parsed = parseSoldierInput(value);
+        if (!parsed) {
+            alert('กรุณากรอกเป็นรูปแบบ: รหัส พลฯ ชื่อ นามสกุล');
+            showSoldierManagerModal(false);
+            return;
+        }
+        soldierManagerState.groups[soldierManagerState.activeGroup][index] = parsed;
+    }
+
+    function removeSoldierManagerName(index) {
+        soldierManagerState.groups[soldierManagerState.activeGroup].splice(index, 1);
+        showSoldierManagerModal(false);
+    }
+
+    function addNewSoldier() {
+        const input = document.getElementById('newSoldierName');
+        const parsed = parseSoldierInput(input && input.value);
+        if (!parsed) {
+            alert('กรุณากรอกเป็นรูปแบบ: รหัส พลฯ ชื่อ นามสกุล');
+            return;
+        }
+        soldierManagerState.groups[soldierManagerState.activeGroup].push(parsed);
+        showSoldierManagerModal(false);
+    }
+
+    function importExcelFile(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        if (typeof XLSX === 'undefined') {
+            alert('ไม่สามารถอ่าน Excel ได้ เพราะไลบรารี XLSX ยังไม่โหลด');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                let added = 0;
+
+                rows.slice(1).forEach(row => {
+                    const code = String(row[0] || '').trim();
+                    const rank = String(row[1] || '').trim();
+                    const firstName = String(row[2] || '').trim();
+                    const lastName = String(row[3] || '').trim();
+                    const parsed = parseSoldierInput(`${code} ${rank} ${firstName} ${lastName}`);
+                    if (parsed) {
+                        soldierManagerState.groups[soldierManagerState.activeGroup].push(parsed);
+                        added++;
+                    }
+                });
+
+                alert(`นำเข้ารายชื่อสำเร็จ ${added} รายการ`);
+                showSoldierManagerModal(false);
+            } catch (error) {
+                console.error(error);
+                alert('อ่านไฟล์ Excel ไม่สำเร็จ');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    async function saveSoldierDatabase() {
+        try {
+            const response = await fetch('save_soldiers.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ groups: soldierManagerState.groups })
+            });
+            const result = await response.json().catch(() => ({}));
+
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(result.message || 'Cannot save soldiers');
+            }
+
+            alert(`บันทึกลงฐานข้อมูลสำเร็จ ${result.saved || 0} รายการ`);
+            closeEditUI();
+            syncDashboardData();
+        } catch (error) {
+            console.error(error);
+            alert('บันทึกรายชื่อพลทหารลงฐานข้อมูลไม่สำเร็จ');
+        }
+    }
+
+    function closeEditUI() {
+        const modal = document.getElementById('soldierEditModal');
+        if (modal) modal.remove();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const headerActions = document.querySelector('.header > div:last-child');
+        const target = headerActions || document.querySelector('.header');
+        if (!target) return;
+
+        let btn = document.getElementById('editSoldierBtn');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'editSoldierBtn';
+            target.appendChild(btn);
+        }
+
+        btn.type = 'button';
+        btn.textContent = 'จัดการรายชื่อพลทหาร';
+        btn.onclick = openSoldierManager;
+        btn.style.cssText = `
+            background-color:#0f766e;color:#fff;border:1px solid #0f766e;
+            padding:10px 16px;font-size:14px;font-weight:700;
+            border-radius:4px;cursor:pointer;transition:background .2s;
+            white-space:nowrap;
+        `;
+        btn.onmouseover = () => btn.style.background = '#0d665f';
+        btn.onmouseout = () => btn.style.background = '#0f766e';
     });
 </script>
 
